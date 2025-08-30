@@ -1,14 +1,6 @@
 # Semgrep Runner
 
-A Python tool that runs Semgrep on GitHub repositories and provides a modern web UI to view scan results.
-
-## Features
-
-- Detect vulnerabilities in repositories using Semgrep.
-- Web interface with job-based scanning.
-- Dark mode UI with expandable details per report.
-- Stores scan metadata in MongoDB.
-- Uses Poetry for dependency management.
+A Python tool that runs Semgrep on GitHub repositories and provides a web UI to view scan results.
 
 ## Installation
 
@@ -24,6 +16,17 @@ cd semgrep-runner
 ```bash
 poetry install --no-root
 ```
+
+3. Build the front-end
+```bash
+cd frontend
+npm install
+npm run build
+```
+
+4. Configure the app
+    1. Create a `config.toml` from `config.toml.sample`
+    2. Add the required configurations as appropriate
 
 ## Usage
 

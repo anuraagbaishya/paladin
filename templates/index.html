@@ -1,14 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
-  <title>Semgrep Vulnerability Scanner</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <title>Vuln Reports</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='js/assets/index.css') }}">
 </head>
-<body>
-<h1>Semgrep Vulnerability Scanner</h1>
-<div id="reports">Loading reports...</div>
 
-<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+<body>
+  <div id="root"></div>
+  <script type="module" src="{{ url_for('static', filename='js/bundle.js') }}"></script>
 </body>
+
 </html>

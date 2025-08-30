@@ -4,15 +4,48 @@ from scanner.scan import clone_repo, run_semgrep, delete_repo_if_no_findings
 from uuid import uuid4
 from datetime import datetime, timezone
 import threading
-import json
+import tomllib
+from pathlib import Path
 
 app = Flask(__name__)
 
-client = MongoClient("mongodb://localhost:27017")
+config_path = Path("config.toml")
+
+with config_path.open("rb") as f:
+    config = tomllib.load(f)
+
+mongo_path: str = config["mongo"]["mongo_path"]
+client = MongoClient(f"mongodb://{mongo_path}")
 db = client.go_vuln_db
 vuln_reports = db.vuln_reports
 scan_metadata = db.scan_metadata
 jobs_collection = db.scan_jobs
+
+
+def get_reports_by_pkg():
+    pipeline = [
+        {
+            "$group": {
+                "_id": {"repo": "$repo", "pkg": "$package"},
+                "findings": {
+                    "$push": {
+                        "ghsa": "$ghsa",
+                        "cve": "$cve",
+                        "cwe": "$cwe",
+                        "forks": "$forks",
+                        "stars": "$stars",
+                        "title": "$title",
+                        "cvss_score": "$cvss_score",
+                        "cvss_vector": "$cvss_vector",
+                        "severity": "$severity",
+                    }
+                },
+            }
+        },
+        {"$project": {"_id": 0, "repo": "$_id.repo", "pkg": "$_id.pkg", "findings": 1}},
+        {"$sort": {"repo": 1}},
+    ]
+    return list(vuln_reports.aggregate(pipeline))
 
 
 def run_scan_job(job_id: str, repo_url: str):
@@ -63,9 +96,7 @@ def index():
 
 @app.route("/vuln_reports")
 def get_vuln_reports():
-    reports = list(vuln_reports.find())
-    for r in reports:
-        r["_id"] = str(r["_id"])
+    reports = get_reports_by_pkg()
     return jsonify(reports)
 
 

@@ -1,0 +1,9 @@
+[paths]
+semgrep_rules_dir = ""
+clone_base_dir = ""
+
+[settings]
+exclude_langs = []
+
+[mongo]
+mongo_path = ""

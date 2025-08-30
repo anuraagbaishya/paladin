@@ -1,16 +1,24 @@
 import subprocess
 from pathlib import Path
 from typing import List, Optional
+import logging
 import shutil
-import tempfile
-import uuid
 import git
 import json
 import re
+import tomllib
 
-SEMREGEP_RULES_DIR: Path = Path("/Users/anuraagbaishya/Projects/semgrep-rules")
-EXCLUDE_LANGS = {"Dockerfile", "Makefile", "YAML", "JSON"}
-CLONE_BASE_DIR = Path("/tmp/repos")
+config_path = Path("config.toml")
+
+with config_path.open("rb") as f:
+    config = tomllib.load(f)
+
+SEMREGEP_RULES_DIR: Path = Path(config["paths"]["semgrep_rules_dir"])
+CLONE_BASE_DIR: Path = Path(config["paths"]["clone_base_dir"])
+EXCLUDE_LANGS = set(config["settings"]["exclude_langs"])
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 
 def clone_repo(repo_url: str) -> Path:
@@ -60,7 +68,7 @@ def run_semgrep(
             valid_rule_dirs.append(rule_dir)
 
     if not valid_rule_dirs:
-        print("No valid rule directories found.")
+        logger.info("No valid rule directories found.")
         return ""
 
     # Build semgrep command
@@ -75,11 +83,11 @@ def run_semgrep(
     cmd.extend(["--sarif"])
     cmd.append(str(target_dir))
 
-    print(f"Running semgrep with command: {' '.join(cmd)}")
+    logger.info(f"Running semgrep with command: {' '.join(cmd)}")
 
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode not in (0, 1):
-        print(f"Error running semgrep: {result.stderr}")
+        logger.info(f"Error running semgrep: {result.stderr}")
         return ""
 
     return result.stdout
@@ -91,6 +99,6 @@ def delete_repo_if_no_findings(repo_dir: Path, semgrep_output: str) -> None:
     """
     if not semgrep_output.strip():
         shutil.rmtree(repo_dir)
-        print(f"Deleted {repo_dir} (no findings)")
+        logger.info(f"Deleted {repo_dir} (no findings)")
     else:
-        print(f"Findings detected in {repo_dir}, keeping repo.")
+        logger.info(f"Findings detected in {repo_dir}, keeping repo.")
