@@ -38,33 +38,10 @@ poetry run python app.py
 
 Open your browser at [http://127.0.0.1:9001](http://127.0.0.1:9001) to access the web UI.
 
+
 ### Scanning
 
 - Click the **Scan** button next to a repository to start a scan.
 - Scan progress is displayed with a spinner, and completion is indicated with a tick.
-- Scan metadata is automatically stored in MongoDB.
-
-## Project Structure
-
-```
-semgrep-runner/
-├─ app.py           # Flask app and backend APIs
-├─ scanner/         # Scan logic (clone, run Semgrep, etc.)
-├─ static/          # JS, CSS, images
-├─ templates/       # HTML templates
-├─ pyproject.toml   # Poetry configuration
-└─ README.md
-```
-
-## Dependencies
-
-- Python 3.13+
-- Flask 3.1.2
-- GitPython 3.1.45
-- PyMongo 4.14.1
-- Semgrep (installed separately)
-
-## Notes
-
-- Poetry manages dependencies; the project itself does not need to be installed as a package.
-- Semgrep rules should be placed in `SEMGREP_RULES_DIR`.
+- Scan results are written to MongoDB.
+- Scan results can be using the Sarif viewer by clickinh on **Show Scans** button and the clicking on a scan result.

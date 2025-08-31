@@ -1,5 +1,5 @@
 [project]
-name = "semgrep-runner"
+name = "Paladin"
 version = "0.1.0"
 description = "Runs semgrep and provides a web-ui to view results"
 authors = [

@@ -3,7 +3,17 @@ semgrep_rules_dir = ""
 clone_base_dir = ""
 
 [settings]
-exclude_langs = []
+exclude_langs = ["Dockerfile", "Makefile", "YAML", "JSON", "HTML", "Terraform"]
+suppress_paths = ["best-practice", "correctness", "portability", "maintainability"]
+suppress_rules = [
+    "go.lang.security.audit.crypto.missing-ssl-minversion",
+    "go.lang.security.audit.use-of-unsafe-block",
+    "go.lang.security.audit.crypto.math-random-used"
+]
 
 [mongo]
-mongo_path = ""
+mongo_path = "localhost:27017"
+
+[deployment]
+host = "127.0.0.1"
+port = 9001
