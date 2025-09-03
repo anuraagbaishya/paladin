@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Report from "./Report.jsx";
 
-export default function ReportGroup({ group }) {
+export default function ReportGroup({ group, findings }) {
     const [scanMessages, setScanMessages] = useState({});
     const [scanningRepos, setScanningRepos] = useState({});
     const [scans, setScans] = useState([]);
@@ -68,6 +68,8 @@ export default function ReportGroup({ group }) {
         return d.toLocaleString(); // e.g., "2025-01-01, 12:00:00 PM"
     };
 
+    const displayFindings = findings ?? group.findings;
+
     return (
         <div className="report-group">
             <div className="report-group-header">
@@ -104,10 +106,14 @@ export default function ReportGroup({ group }) {
             </div>
 
             <div className="group-findings">
-                {group.findings.map((report, idx) => {
-                    const safeId = `${group.repo || group.pkg || "unknown"}_${idx}`;
-                    return <Report key={safeId} report={report} id={safeId} />;
-                })}
+                {displayFindings.length > 0 ? (
+                    displayFindings.map((report, idx) => {
+                        const safeId = `${group.repo || group.pkg || "unknown"}_${idx}`;
+                        return <Report key={safeId} report={report} id={safeId} />;
+                    })
+                ) : (
+                    <p>No findings match your search.</p>
+                )}
             </div>
 
             {/* Area to display fetched scans */}
@@ -115,15 +121,33 @@ export default function ReportGroup({ group }) {
                 <div className="scan-results">
                     <h4>Scan Results:</h4>
                     {scans.length > 0 ? (
-                        <ul>
+                        <div className="scan-result-area">
                             {scans.map((scan) => (
-                                <li key={scan._id}>
-                                    <p><a href={`/sarif/${scan._id}`} target="_blank" rel="noopener noreferrer">
+                                <div key={scan._id} className="scan-item">
+                                    <a
+                                        href={`/sarif/${scan._id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
                                         Scanned at {formatTimestamp(scan.timestamp)}
-                                    </a> {`${scan.findings_count}`} findings</p>
-                                </li>
+                                    </a>
+                                    <span>{`${scan.findings_count}`} findings</span>
+                                    <button
+                                        className="delete-btn"
+                                        onClick={async () => {
+                                            try {
+                                                await fetch(`/api/scans/delete/${scan._id}`, { method: "DELETE" });
+                                                setScans((prev) => prev.filter((s) => s._id !== scan._id));
+                                            } catch (err) {
+                                                console.error("Failed to delete scan", err);
+                                            }
+                                        }}
+                                    >
+                                        Delete
+                                    </button>
+                                </div>
                             ))}
-                        </ul>
+                        </div>
                     ) : (
                         <p>No results found</p>
                     )}

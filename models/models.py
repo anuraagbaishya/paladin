@@ -34,3 +34,32 @@ class Job:
     updated_at: int = field(
         default_factory=lambda: int(datetime.now(timezone.utc).timestamp())
     )
+
+
+@dataclass
+class RepoInfo:
+    repo: str
+    stars: int
+    forks: int
+
+
+@dataclass
+class Cwe:
+    id: int
+    title: str
+
+
+@dataclass
+class VulnReport:
+    package: str
+    repo: Optional[str]
+    ecosystem: str  # TODO: make this enum
+    title: str
+    ghsa: str
+    cve: Optional[str]
+    cwe: Optional[Cwe]
+    stars: Optional[int]
+    forks: Optional[int]
+    severity: str  # TODO: make this enum
+    cvss_score: Optional[float]
+    cvss_vector: Optional[str]

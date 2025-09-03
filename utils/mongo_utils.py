@@ -5,8 +5,9 @@ from urllib.parse import unquote
 
 from bson import ObjectId
 from pymongo import MongoClient
+from pymongo.results import DeleteResult
 
-from models.models import Job, JobStatus, ScanResult
+from models.models import Job, JobStatus, ScanResult, Cwe, VulnReport
 
 
 class MongoUtils:
@@ -14,10 +15,11 @@ class MongoUtils:
         self.mongo_path: str = config["mongo"]["mongo_path"]
         self.client: MongoClient = MongoClient(f"mongodb://{self.mongo_path}")
         self.db = self.client.go_vuln_db
-        self.vuln_reports = self.db.vuln_reports
+        self.vuln_reports_collection = self.db.vuln_reports
         self.scan_metadata = self.db.scan_metadata
         self.jobs_collection = self.db.scan_jobs
         self.scan_result_collection = self.db.scan_results
+        self.cwe_collection = self.db.cwes
 
     def get_reports_by_pkg(self):
         pipeline = [
@@ -49,7 +51,7 @@ class MongoUtils:
             },
             {"$sort": {"repo": 1}},
         ]
-        return list(self.vuln_reports.aggregate(pipeline))
+        return list(self.vuln_reports_collection.aggregate(pipeline))
 
     def add_scan_result_to_db(self, repo: str, sarif: Dict[str, Any]):
         scan_result = ScanResult(
@@ -78,6 +80,12 @@ class MongoUtils:
     def get_sarif_by_id(self, id: str) -> Dict[str, Any]:
         sarif = self.scan_result_collection.find_one({"_id": ObjectId(id)})
         return sarif["scan_result"]  # type: ignore
+
+    def delete_scan_by_id(self, id: str) -> bool:
+        result: DeleteResult = self.scan_result_collection.delete_one(
+            {"_id": ObjectId(id)}
+        )
+        return result.deleted_count > 0
 
     def add_job_to_db(self, repo_url: str) -> Job:
         job = Job(repo_url)
@@ -120,3 +128,22 @@ class MongoUtils:
 
         res["status"] = JobStatus(res["status"])
         return Job(**res)
+
+    def add_cwe_to_db(self, cwe: Cwe) -> None:
+        self.cwe_collection.insert_one(asdict(cwe))
+
+    def do_cwes_exist(self) -> bool:
+        return not not self.cwe_collection.count_documents({})
+
+    def get_cwe_title(self, cwe_id: int) -> Optional[str]:
+        cwe = self.cwe_collection.find_one({"cwe_id": cwe_id})
+        if cwe:
+            return cwe["title"]
+        return None
+
+    def upsert_vuln_report_to_db(self, report: VulnReport):
+        self.vuln_reports_collection.update_one(
+            {"ghsa": report.ghsa, "repo": report.repo},
+            {"$set": asdict(report)},
+            upsert=True,
+        )
