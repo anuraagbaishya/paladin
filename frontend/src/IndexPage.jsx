@@ -5,12 +5,16 @@ import "./styles.css";
 export default function IndexPage() {
     const [groups, setGroups] = useState([]);
     const [error, setError] = useState(null);
-    const [query, setQuery] = useState(""); // 🔎 search query
+    const [query, setQuery] = useState("");
+    const [showAlert, setShowAlert] = useState(false);
+    const [days, setDays] = useState(7);
+    const [editingDays, setEditingDays] = useState(false);
+    const [daysInput, setDaysInput] = useState("7");
 
     useEffect(() => {
         async function loadReports() {
             try {
-                const resp = await fetch("/api/vuln_reports"); // <-- backend path
+                const resp = await fetch("/api/vuln_reports");
                 const data = await resp.json();
                 setGroups(data);
             } catch (err) {
@@ -30,7 +34,7 @@ export default function IndexPage() {
                     report.title,
                     report.cve,
                     report.ghsa,
-                    report.cwe,
+                    report.cwe?.title,
                     report.severity,
                     report.package,
                     group.repo,
@@ -44,7 +48,18 @@ export default function IndexPage() {
             });
             return { ...group, findings: filteredFindings };
         })
-        .filter((group) => group.findings.length > 0); // hide empty groups
+        .filter((group) => group.findings.length > 0);
+
+    const handleRefresh = async (refreshDays = days) => {
+        try {
+            setShowAlert(true);
+            await fetch(`/api/refresh_reports?days=${refreshDays}`);
+            setTimeout(() => setShowAlert(false), 2000);
+        } catch (err) {
+            console.error("Failed to refresh reports", err);
+            setShowAlert(false);
+        }
+    };
 
     return (
         <div className="app-container">
@@ -62,10 +77,43 @@ export default function IndexPage() {
                         <path d="M12 2L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-3z" />
                     </svg>
                     <h1>PALADIN</h1>
-
                 </div>
 
-                <div className="search-bar">
+                <div className="right-bar">
+                    <div className="refresh-control">
+                        <button className="refresh-main" onClick={() => handleRefresh(days)}>
+                            Refresh
+                        </button>
+
+                        <div className="refresh-days-container">
+                            {editingDays ? (
+                                <input
+                                    type="text"
+                                    className="days-input-inline"
+                                    value={days}
+                                    onChange={(e) => setDays(e.target.value)} // e.target.value is a string
+                                    onBlur={() => setEditingDays(false)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === "Escape") e.target.blur();
+                                    }}
+                                    autoFocus
+                                />
+                            ) : (
+                                <span className="days-display" onClick={() => setEditingDays(true)}>
+                                    {days} days
+                                </span>
+                            )}
+
+                            <span
+                                className="refresh-chevron"
+                                onMouseDown={(e) => e.preventDefault()} // keep focus on input
+                                onClick={() => setEditingDays((prev) => !prev)}
+                            >
+                                ▼
+                            </span>
+                        </div>
+                    </div>
+
                     <div className="search-wrapper">
                         <svg
                             className="search-icon"
@@ -88,6 +136,7 @@ export default function IndexPage() {
                 </div>
             </header>
 
+            {showAlert && <div className="refresh-alert">Refreshing...</div>}
 
             {/* Reports List */}
             <div id="reports">

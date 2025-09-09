@@ -23,15 +23,16 @@ body {
   gap: 12px;
 }
 
-.search-bar {
+.right-bar {
   margin-left: auto;
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
 .search-wrapper {
   position: relative;
-  display: inline-block;
+  /* display: inline-block; */
 }
 
 .search-icon {
@@ -45,7 +46,7 @@ body {
 
 .search-input {
   padding: 12px 12px 12px 32px;
-  border-radius: 18px;
+  border-radius: 5px;
   border: none;
   outline: none;
   font-size: .85em;
@@ -253,3 +254,78 @@ button.get-scans-btn:disabled {
   border-radius: 4px;
   font-size: 0.9em;
 }
+
+.refresh-control {
+  display: flex;
+  align-items: center;
+  border-radius: 6px;
+  overflow: hidden;
+  /* keeps them looking like one piece */
+  border: 1px solid #90f923;
+}
+
+.refresh-main,
+.refresh-days-container {
+  background-color: #90f923;
+  color: #010d1f;
+  border: none;
+  padding: 6px 12px;
+  font-size: 0.95em;
+  height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+.refresh-main {
+  cursor: pointer;
+  border-right: 1px solid #010d1f;
+  /* vertical divider */
+}
+
+.refresh-days-container {
+  gap: 4px;
+}
+
+.days-display {
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.days-input-inline {
+  width: 40px;
+  padding: 2px 4px;
+  border: 1px solid #010d1f;
+  border-radius: 4px;
+  font-size: 0.95em;
+  text-align: center;
+  background-color: #1f3d6b;
+  color: #fff;
+}
+
+.refresh-chevron {
+  cursor: pointer;
+  font-size: 0.8em;
+  user-select: none;
+}
+
+
+
+.refresh-alert {
+  position: fixed;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: #1f3d6b;
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 6px;
+  font-size: 1.1em;
+  opacity: 0.9;
+  z-index: 1000;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* .refresh-chevron {
+  color: #010d1f;
+  margin-left: 2px;
+  cursor: pointer;
+} */

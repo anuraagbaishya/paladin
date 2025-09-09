@@ -60,13 +60,12 @@ export default function Report({ report, idBase, index }) {
         }
 
         if (report.cwe) {
-            const match = report.cwe.match(/CWE-(\d+)/);
             const link = (
                 <a
-                    href={match ? `https://cwe.mitre.org/data/definitions/${match[1]}.html` : "#"}
+                    href={`https://cwe.mitre.org/data/definitions/${report.cwe.id}.html`}
                     target="_blank"
                 >
-                    {report.cwe}
+                    CWE-{report.cwe.id}: {report.cwe.title}
                 </a>
             );
             addRow("CWE", link);
