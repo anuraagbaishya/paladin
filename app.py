@@ -1,16 +1,11 @@
-import json
 import logging
-import os
 import sys
 import threading
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, Tuple, Union
+from typing import Tuple, Union
 
-from bson import ObjectId
 from flask import Flask, Response, jsonify, render_template, request
 
-from models.models import Job, JobStatus
+from models.models import Job
 from scanner.scan import Scanner
 from refresher.refresh import Refresher
 
@@ -89,9 +84,12 @@ def get_scan_status(job_id) -> Union[Response, Tuple]:
 
 @app.route("/api/refresh_reports")
 def refresh_reports() -> Union[Response, Tuple]:
-    refresher = Refresher(mongo_utils)
+    if not refresher.token:
+        return jsonify({"status": "error: github token not configured"}), 400
 
-    threading.Thread(target=refresher.refresh, daemon=True).start()
+    days: int = int(request.args.get("days", 7))
+
+    threading.Thread(target=refresher.refresh, args=(days,), daemon=True).start()
 
     return jsonify({"status": "OK"})
 
@@ -105,8 +103,9 @@ if __name__ == "__main__":
 
     mongo_utils: MongoUtils = MongoUtils(config)
     deployment = config["deployment"]
+    github_token = config.get("tokens", {}).get("github_token", None)
 
     scanner: Scanner = Scanner(config, mongo_utils)
-    refresher: Refresher = Refresher(mongo_utils)
+    refresher: Refresher = Refresher(github_token, mongo_utils)
 
     app.run(debug=True, host=deployment["host"], port=deployment["port"])

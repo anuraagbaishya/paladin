@@ -129,21 +129,9 @@ class MongoUtils:
         res["status"] = JobStatus(res["status"])
         return Job(**res)
 
-    def add_cwe_to_db(self, cwe: Cwe) -> None:
-        self.cwe_collection.insert_one(asdict(cwe))
-
-    def do_cwes_exist(self) -> bool:
-        return not not self.cwe_collection.count_documents({})
-
-    def get_cwe_title(self, cwe_id: int) -> Optional[str]:
-        cwe = self.cwe_collection.find_one({"cwe_id": cwe_id})
-        if cwe:
-            return cwe["title"]
-        return None
-
     def upsert_vuln_report_to_db(self, report: VulnReport):
         self.vuln_reports_collection.update_one(
-            {"ghsa": report.ghsa, "repo": report.repo},
+            {"ghsa": report.ghsa},
             {"$set": asdict(report)},
             upsert=True,
         )

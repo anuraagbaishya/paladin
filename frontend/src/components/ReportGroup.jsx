@@ -69,6 +69,7 @@ export default function ReportGroup({ group, findings }) {
     };
 
     const displayFindings = findings ?? group.findings;
+    console.log(group)
 
     return (
         <div className="report-group">

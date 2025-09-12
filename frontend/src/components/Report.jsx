@@ -11,6 +11,8 @@ export default function Report({ report, idBase, index }) {
     const buildDetails = () => {
         const rows = [];
 
+        console.log(report)
+
         function addRow(key, value) {
             if (!value) return;
             rows.push(

@@ -45,7 +45,7 @@ class RepoInfo:
 
 @dataclass
 class Cwe:
-    id: int
+    id: str
     title: str
 
 
