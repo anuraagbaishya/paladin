@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from "react";
 import ReportGroup from "./components/ReportGroup";
+import Header from "./components/Header";
+import FilterPanel from "./components/FilterPanel";
+import filterIcon from "./assets/filter.png";
 import "./styles.css";
 
 export default function IndexPage() {
@@ -9,7 +12,10 @@ export default function IndexPage() {
     const [showAlert, setShowAlert] = useState(false);
     const [days, setDays] = useState(7);
     const [editingDays, setEditingDays] = useState(false);
-    const [daysInput, setDaysInput] = useState("7");
+    const [repoFilter, setRepoFilter] = useState("all");
+    const [ecosystemFilter, setEcosystemFilter] = useState("all");
+    const [severityFilter, setSeverityFilter] = useState("all");
+    const [showFilters, setShowFilters] = useState(false);
 
     useEffect(() => {
         async function loadReports() {
@@ -28,27 +34,25 @@ export default function IndexPage() {
     if (error) return <div>{error}</div>;
 
     const filteredGroups = groups
-        .map((group) => {
-            const filteredFindings = group.findings.filter((report) => {
+        .map(group => {
+            const filteredFindings = group.findings.filter(report => {
                 const haystack = [
-                    report.title,
-                    report.cve,
-                    report.ghsa,
-                    report.cwe?.title,
-                    report.severity,
-                    report.package,
-                    group.repo,
-                    group.pkg,
-                ]
-                    .filter(Boolean)
-                    .join(" ")
-                    .toLowerCase();
+                    report.title, report.cve, report.ghsa, report.cwe?.title,
+                    report.severity, report.package, report.ecosystem,
+                    group.repo, group.pkg
+                ].filter(Boolean).join(" ").toLowerCase();
 
-                return haystack.includes(query.toLowerCase());
+                if (!haystack.includes(query.toLowerCase())) return false;
+                if (repoFilter === "withRepo" && !group.repo) return false;
+                if (repoFilter === "withoutRepo" && group.repo) return false;
+                if (ecosystemFilter !== "all" && report.ecosystem !== ecosystemFilter) return false;
+                if (severityFilter !== "all" && report.severity?.toLowerCase() !== severityFilter) return false;
+
+                return true;
             });
             return { ...group, findings: filteredFindings };
         })
-        .filter((group) => group.findings.length > 0);
+        .filter(group => group.findings.length > 0);
 
     const handleRefresh = async (refreshDays = days) => {
         try {
@@ -63,90 +67,51 @@ export default function IndexPage() {
 
     return (
         <div className="app-container">
-            {/* Top Banner */}
-            <header className="app-banner">
-                <div className="banner-content">
+            <Header
+                days={days} setDays={setDays}
+                editingDays={editingDays} setEditingDays={setEditingDays}
+                handleRefresh={handleRefresh}
+            >
+                {/* Small components stay here */}
+                <div className="search-wrapper">
                     <svg
-                        className="shield-icon"
+                        className="search-icon"
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
                         fill="currentColor"
-                        width="32"
-                        height="32"
+                        width="16"
+                        height="16"
                     >
-                        <path d="M12 2L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-3z" />
+                        <path d="M10 2a8 8 0 105.293 14.707l4.387 4.386 1.414-1.414-4.386-4.387A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z" />
                     </svg>
-                    <h1>PALADIN</h1>
+                    <input
+                        type="text"
+                        placeholder="Search across all repos..."
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        className="search-input"
+                    />
                 </div>
 
-                <div className="right-bar">
-                    <div className="refresh-control">
-                        <button className="refresh-main" onClick={() => handleRefresh(days)}>
-                            Refresh
-                        </button>
-
-                        <div className="refresh-days-container">
-                            {editingDays ? (
-                                <input
-                                    type="text"
-                                    className="days-input-inline"
-                                    value={days}
-                                    onChange={(e) => setDays(e.target.value)} // e.target.value is a string
-                                    onBlur={() => setEditingDays(false)}
-                                    onKeyDown={(e) => {
-                                        if (e.key === "Enter" || e.key === "Escape") e.target.blur();
-                                    }}
-                                    autoFocus
-                                />
-                            ) : (
-                                <span className="days-display" onClick={() => setEditingDays(true)}>
-                                    {days} days
-                                </span>
-                            )}
-
-                            <span
-                                className="refresh-chevron"
-                                onMouseDown={(e) => e.preventDefault()} // keep focus on input
-                                onClick={() => setEditingDays((prev) => !prev)}
-                            >
-                                ▼
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="search-wrapper">
-                        <svg
-                            className="search-icon"
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            width="16"
-                            height="16"
-                        >
-                            <path d="M10 2a8 8 0 105.293 14.707l4.387 4.386 1.414-1.414-4.386-4.387A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z" />
-                        </svg>
-                        <input
-                            type="text"
-                            placeholder="Search across all repos..."
-                            value={query}
-                            onChange={(e) => setQuery(e.target.value)}
-                            className="search-input"
-                        />
-                    </div>
-                </div>
-            </header>
+                <button className="filters-button" onClick={() => setShowFilters(true)}>
+                    <img src={filterIcon} className="filters-icon" />
+                    Filters
+                </button>
+            </Header>
 
             {showAlert && <div className="refresh-alert">Refreshing...</div>}
 
-            {/* Reports List */}
+            <FilterPanel
+                showFilters={showFilters} setShowFilters={setShowFilters}
+                repoFilter={repoFilter} setRepoFilter={setRepoFilter}
+                ecosystemFilter={ecosystemFilter} setEcosystemFilter={setEcosystemFilter}
+                severityFilter={severityFilter} setSeverityFilter={setSeverityFilter}
+            />
+
             <div id="reports">
-                {filteredGroups.length > 0 ? (
-                    filteredGroups.map((group, idx) => (
-                        <ReportGroup key={idx} group={group} />
-                    ))
-                ) : (
-                    <p>No findings match your search.</p>
-                )}
+                {filteredGroups.length > 0 ? filteredGroups.map((group, idx) => (
+                    <ReportGroup key={idx} group={group} />
+                )) : <p>No findings match your search.</p>}
             </div>
         </div>
     );

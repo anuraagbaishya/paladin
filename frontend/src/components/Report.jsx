@@ -67,7 +67,7 @@ export default function Report({ report, idBase, index }) {
                     href={`https://cwe.mitre.org/data/definitions/${report.cwe.id}.html`}
                     target="_blank"
                 >
-                    CWE-{report.cwe.id}: {report.cwe.title}
+                    {report.cwe.id}: {report.cwe.title}
                 </a>
             );
             addRow("CWE", link);

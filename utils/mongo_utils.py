@@ -37,6 +37,7 @@ class MongoUtils:
                             "cvss_score": "$cvss_score",
                             "cvss_vector": "$cvss_vector",
                             "severity": "$severity",
+                            "ecosystem": "$ecosystem",
                         }
                     },
                 }
