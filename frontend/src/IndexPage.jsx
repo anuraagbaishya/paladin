@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import ReportGroup from "./components/ReportGroup";
+import GhsaReportGroup from "./components/GhsaReportGroup";
 import Header from "./components/Header";
 import FilterPanel from "./components/FilterPanel";
 import filterIcon from "./assets/filter.png";
@@ -110,7 +110,7 @@ export default function IndexPage() {
 
             <div id="reports">
                 {filteredGroups.length > 0 ? filteredGroups.map((group, idx) => (
-                    <ReportGroup key={idx} group={group} />
+                    <GhsaReportGroup key={idx} group={group} />
                 )) : <p>No findings match your search.</p>}
             </div>
         </div>

@@ -14,20 +14,29 @@ body {
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .banner-content {
   display: flex;
   align-items: center;
-  justify-content: flex-start;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .right-bar {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  min-width: 0;
+}
+
+.right-bar>* {
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .search-wrapper {
@@ -118,7 +127,7 @@ body {
   cursor: pointer;
 }
 
-.chevron {
+.report-chevron {
   display: inline-block;
   transition: transform 0.2s;
   font-size: 1.2em;
@@ -257,55 +266,66 @@ button.get-scans-btn:disabled {
 
 .refresh-control {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   border-radius: 6px;
   overflow: hidden;
-  /* keeps them looking like one piece */
   border: 1px solid #90f923;
-}
-
-.refresh-main,
-.refresh-days-container {
-  background-color: #90f923;
-  color: #010d1f;
-  border: none;
-  padding: 6px 12px;
-  font-size: 0.95em;
   height: 36px;
-  display: flex;
-  align-items: center;
+  font-size: 0.95em;
 }
 
 .refresh-main {
-  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 12px;
+  background-color: #90f923;
+  color: #010d1f;
+  border: none;
   border-right: 1px solid #010d1f;
-  /* vertical divider */
+  height: 100%;
+  cursor: pointer;
+  font-size: inherit;
+  flex-shrink: 0;
 }
 
 .refresh-days-container {
+  display: flex;
+  align-items: center;
   gap: 4px;
+  padding: 0 12px;
+  height: 100%;
+  background-color: #90f923;
+  flex-shrink: 0;
 }
 
 .days-display {
   cursor: pointer;
   font-weight: 500;
+  color: #010d1f;
 }
 
 .days-input-inline {
-  width: 40px;
-  padding: 2px 4px;
+  width: 50px;
+  max-width: 50px;
+  padding: 0 4px;
+  height: 28px;
+  box-sizing: border-box;
   border: 1px solid #010d1f;
   border-radius: 4px;
-  font-size: 0.95em;
-  text-align: center;
   background-color: #1f3d6b;
   color: #fff;
+  font-size: inherit;
+  text-align: center;
 }
 
 .refresh-chevron {
   cursor: pointer;
   font-size: 0.8em;
   user-select: none;
+  display: flex;
+  align-items: center;
+  color: #010d1f;
 }
 
 .refresh-alert {
@@ -435,4 +455,23 @@ button.get-scans-btn:disabled {
   height: 18px;
   object-fit: contain;
   margin-right: 6px;
+}
+
+.file-viewer {
+  background: #010d1f;
+  padding: 16px;
+  border-radius: 8px;
+  margin-top: 8px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.report-details button {
+  background-color: #90f923;
+  border: none;
+  padding: 4px 8px;
+  margin-top: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 0.90em;
 }

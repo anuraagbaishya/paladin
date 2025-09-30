@@ -1,7 +1,7 @@
 import { useState } from "react";
-import Report from "./Report.jsx";
+import GhsaReport from "./GhsaReport";
 
-export default function ReportGroup({ group, findings }) {
+export default function GhsaReportGroup({ group, findings }) {
     const [scanMessages, setScanMessages] = useState({});
     const [scanningRepos, setScanningRepos] = useState({});
     const [scans, setScans] = useState([]);
@@ -110,7 +110,7 @@ export default function ReportGroup({ group, findings }) {
                 {displayFindings.length > 0 ? (
                     displayFindings.map((report, idx) => {
                         const safeId = `${group.repo || group.pkg || "unknown"}_${idx}`;
-                        return <Report key={safeId} report={report} id={safeId} />;
+                        return <GhsaReport key={safeId} report={report} id={safeId} />;
                     })
                 ) : (
                     <p>No findings match your search.</p>

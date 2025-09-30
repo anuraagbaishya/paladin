@@ -88,6 +88,11 @@ class MongoUtils:
         )
         return result.deleted_count > 0
 
+    def update_scan_by_id(self, id: str, sarif: Dict[str, Any]) -> None:
+        self.scan_result_collection.update_one(
+            {"_id": ObjectId(id)}, {"$set": {"scan_result": sarif}}
+        )
+
     def add_job_to_db(self, repo_url: str) -> Job:
         job = Job(repo_url)
 

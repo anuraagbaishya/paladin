@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-export default function Report({ report, idBase, index }) {
+export default function GhsaReport({ report, idBase, index }) {
     const [expanded, setExpanded] = useState(false);
     const safeId = `${(idBase || "unknown").replace(/\//g, "_")}_${index}`;
 
@@ -10,9 +10,6 @@ export default function Report({ report, idBase, index }) {
 
     const buildDetails = () => {
         const rows = [];
-
-        console.log(report)
-
         function addRow(key, value) {
             if (!value) return;
             rows.push(
@@ -62,9 +59,10 @@ export default function Report({ report, idBase, index }) {
         }
 
         if (report.cwe) {
+            const cweNum = report.cwe.id.split("-")[1]
             const link = (
                 <a
-                    href={`https://cwe.mitre.org/data/definitions/${report.cwe.id}.html`}
+                    href={`https://cwe.mitre.org/data/definitions/${cweNum}.html`}
                     target="_blank"
                 >
                     {report.cwe.id}: {report.cwe.title}
@@ -86,7 +84,7 @@ export default function Report({ report, idBase, index }) {
         <div className="report">
             <div className="report-header">
                 <div className="header-left" onClick={toggleDetails}>
-                    <span className={`chevron ${expanded ? "rotate" : ""}`} id={`chevron-${safeId}`}>
+                    <span className={`report-chevron ${expanded ? "rotate" : ""}`} id={`chevron-${safeId}`}>
                         ▶
                     </span>
                     <p>{titleSummary}</p>

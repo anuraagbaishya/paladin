@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
-import { Viewer } from "@microsoft/sarif-web-component";
+import SarifReportGroup from "./components/SarifReportGroup";
 
 export default function SarifPage() {
     const { id } = useParams();
@@ -25,12 +25,15 @@ export default function SarifPage() {
     if (error) return <div>{error}</div>;
     if (!sarifLog) return <div>Loading SARIF report...</div>;
 
+    // Extract all findings from all runs
+    const findings = (sarifLog.runs ?? []).flatMap(run => run.results ?? []);
+
     return (
         <div className="app-container">
             <header className="app-banner">
-                < div className="banner-content" >
+                <div className="banner-content">
                     {/* Shield icon */}
-                    < svg
+                    <svg
                         className="shield-icon"
                         xmlns="http://www.w3.org/2000/svg"
                         viewBox="0 0 24 24"
@@ -39,13 +42,14 @@ export default function SarifPage() {
                         height="32"
                     >
                         <path d="M12 2L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-3z" />
-                    </svg >
+                    </svg>
                     <h1>PALADIN</h1>
-                </div >
-            </header >
+                </div>
+            </header>
 
-            <Viewer logs={[sarifLog]} />
-        </div >
+            <main className="p-4">
+                <SarifReportGroup findings={findings} groupName="SARIF Findings" />
+            </main>
+        </div>
     );
 }
-

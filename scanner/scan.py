@@ -3,6 +3,7 @@ import logging
 import re
 import shutil
 import subprocess
+import hashlib
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 from bson import ObjectId
@@ -64,7 +65,7 @@ class Scanner:
 
         except Exception as e:
             self.mongo.update_job_on_error(job_id, str(e))
-            self.logger.error(f"Scan failed for {repo_name}")
+            self.logger.error(f"Scan failed for {repo_name} with error {e}")
 
     def clone_repo(self, repo_url: str) -> Path:
         # Use last two parts of repo for folder name (e.g., github.com/rs/cors -> rs_cors)
@@ -138,6 +139,24 @@ class Scanner:
 
         return result.stdout
 
+    def mark_sarif_suppressed_by_fingerprint(
+        self, scan_id: str, fingerprint_id: str, suppress: bool = True
+    ) -> Dict[str, Any]:
+        sarif = self.mongo.get_sarif_by_id(scan_id)
+        if not sarif:
+            raise ValueError(f"SARIF not found for scan ID {scan_id}")
+
+        # Update matching results
+        for run in sarif.get("runs", []):
+            for result in run.get("results", []):
+                fingerprints = result.get("fingerprints", {})
+                if fingerprints.get("paladin") == fingerprint_id:
+                    result["suppressed"] = suppress
+
+        self.mongo.update_scan_by_id(scan_id, sarif)
+
+        return sarif
+
     def delete_repo_if_no_findings(self, repo_dir: Path, semgrep_output: str) -> None:
         """
         Delete the repo directory if Semgrep found no issues.
@@ -180,6 +199,11 @@ class Scanner:
                     not any(path in rule_id_short for path in self.suppress_paths)
                     and rule_id_short not in self.suppress_rules
                 ):
+                    result["ruleId"] = rule_id_short
+                    # add custom fingerprint
+                    result["fingerprints"] = {
+                        "paladin": self.generate_fingerprint(result)
+                    }
                     cleaned_results.append(result)
 
             run["results"] = cleaned_results
@@ -202,6 +226,7 @@ class Scanner:
                     not any(path in rule_id_short for path in self.suppress_paths)
                     and rule_id_short not in self.suppress_rules
                 ):
+                    rule["id"] = rule_id_short
                     cleaned_rules.append(rule)
 
             driver["rules"] = cleaned_rules
@@ -210,12 +235,36 @@ class Scanner:
 
         return sarif_data_parsed
 
+    def generate_fingerprint(self, result: Dict[str, Any]) -> str:
+        rule_id = result.get("ruleId", "")
+        locations = result.get("locations", [])
+        snippet_texts = []
+
+        for loc in locations:
+            snippet = (
+                loc.get("physicalLocation", {})
+                .get("region", {})
+                .get("snippet", {})
+                .get("text", "")
+            )
+            if snippet:
+                snippet_texts.append(snippet.strip())
+
+        # Concatenate ruleId + snippets for hashing
+        fingerprint_source = rule_id + "|" + "|".join(snippet_texts)
+        fingerprint_hash = hashlib.sha256(
+            fingerprint_source.encode("utf-8")
+        ).hexdigest()[
+            :16
+        ]  # short hash
+        return fingerprint_hash
+
     def write_sarif_to_file(self, sarif: Dict[str, Any], repo: str) -> None:
-        write_json: bool = config.get("settings", {}).get("write_sarif_to_file", None)  # type: ignore
+        write_json: bool = self.config.get("settings", {}).get("write_sarif_to_file", None)  # type: ignore
         if not write_json:
             return
 
-        sarif_write_dir: str = config.get("paths", {}).get("sarif_write_dir", "")  # type: ignore
+        sarif_write_dir: str = self.config.get("paths", {}).get("sarif_write_dir", "")  # type: ignore
         if not sarif_write_dir:
             sarif_write_path: Path = Path(".")
         else:
