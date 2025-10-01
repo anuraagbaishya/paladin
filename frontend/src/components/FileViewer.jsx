@@ -10,10 +10,10 @@ export default function FileViewer({ filePath, startLine, endLine }) {
     useEffect(() => {
         async function fetchFile() {
             try {
-                const resp = await fetch("/api/file", {
+                const resp = await fetch("/api/scan/file", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ file_path: filePath }),
+                    body: JSON.stringify({ filepath: filePath }),
                 });
 
                 const data = await resp.json();

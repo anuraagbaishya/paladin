@@ -1,9 +1,11 @@
-from utils.mongo_utils import MongoUtils
 import logging
-from .gh_apis import GhApis
-from models.models import RepoInfo, VulnReport, Cwe
-from typing import Optional, Dict, Any, List, Set
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Any, Dict, List, Optional, Set
+
+from models.data_models import Cwe, RepoInfo, VulnReport
+from utils.mongo_utils import MongoUtils
+
+from .gh_apis import GhApis
 
 logging.basicConfig(level=logging.INFO)
 
@@ -40,11 +42,10 @@ class Refresher:
                     )
 
             for future in as_completed(futures):
-                future.result()
-                # try:
-                #     future.result()
-                # except Exception as e:
-                #     self.logger.error(f"Error processing vulnerability: {e}")
+                try:
+                    future.result()
+                except Exception as e:
+                    self.logger.error(f"Error processing vulnerability: {e}")
 
             self.logger.info(f"Upserted {count} GHSA entries into MongoDB")
 

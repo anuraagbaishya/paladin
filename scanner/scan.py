@@ -1,32 +1,39 @@
+import hashlib
 import json
 import logging
+import os
 import re
 import shutil
 import subprocess
-import hashlib
+from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-from bson import ObjectId
-from models.models import JobStatus
-import os
-from datetime import datetime, timezone, timedelta
+from typing import Any, Dict, List, Optional, Set
 
 import git
+from bson import ObjectId
+
+from models.data_models import FindingForReview, JobStatus, LocationFromSarif
+from models.response_models import (FileError, FileResponse, ReviewError,
+                                    ReviewResponse)
+from utils.mongo_utils import MongoUtils
+
+from .gemini_ops import GeminiOps
 
 logging.basicConfig(level=logging.INFO)
 
 
 class Scanner:
-    def __init__(self, config, mongo):
+    def __init__(self, config: Dict[str, Any], mongo: MongoUtils) -> None:
         self.config = config
         self.mongo = mongo
         self.logger = logging.getLogger(__name__)
         self.semgrep_rules_dir: Path = Path(self.config["paths"]["semgrep_rules_dir"])
         self.clone_base_dir: Path = Path(self.config["paths"]["clone_base_dir"])
-        self.exclude_langs = (
+        self.exclude_langs: Optional[Set[str]] = (
             set(self.config["settings"]["exclude_langs"])
             if "exclude_langs" in config["settings"]
-            else {}
+            else None
         )
         self.suppress_paths: List[str] = self.config["settings"].get(
             "suppress_paths", []
@@ -34,6 +41,13 @@ class Scanner:
         self.suppress_rules: List[str] = self.config["settings"].get(
             "suppress_rules", []
         )
+        if self.config["tokens"]["gemini_api_key"]:
+            self.gemini_ops = GeminiOps(
+                self.config["tokens"]["gemini_api_key"],
+                self.config["settings"]["gemini_model"],
+            )
+        else:
+            self.gemini_ops = None
 
     def run_scan_job(self, job_id: ObjectId, repo_url: str) -> None:
         """
@@ -66,6 +80,102 @@ class Scanner:
         except Exception as e:
             self.mongo.update_job_on_error(job_id, str(e))
             self.logger.error(f"Scan failed for {repo_name} with error {e}")
+
+    def mark_sarif_suppressed_by_fingerprint(
+        self, scan_id: str, fingerprint_id: str, suppress: bool = True
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Mark SARIF results as suppressed based on a fingerprint.
+        """
+        sarif = self.mongo.get_sarif_by_id(scan_id)
+        if not sarif:
+            return None
+
+        finding = self.get_finding_by_fingerprint(sarif, fingerprint_id)
+        if not finding:
+            self.logger.info(f"No finding for {scan_id}:{fingerprint_id}")
+            return sarif
+
+        finding["suppressed"] = suppress
+
+        self.mongo.update_scan_by_id(scan_id, sarif)
+
+        return sarif
+
+    def get_file(self, filepath: str) -> FileResponse:
+        base_path = Path(self.config["paths"]["clone_base_dir"]).resolve()  # type: ignore
+        requested_path = Path(filepath).resolve()
+
+        # Ensure requested_path is inside base_path
+        try:
+            if os.path.commonpath([str(base_path), str(requested_path)]) != str(
+                base_path
+            ):
+                self.logger.error(f"Invalid path {filepath}")
+                return FileResponse(FileError.INVALID_PATH, None)
+        except ValueError:
+            self.logger.error(f"Invalid path {filepath}")
+            return FileResponse(FileError.INVALID_PATH, None)
+
+        if not requested_path.is_file():
+            self.logger.error(f"File not found {filepath}")
+            return FileResponse(FileError.NOT_FOUND, None)
+
+        try:
+            with requested_path.open("r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+                return FileResponse(None, lines)
+        except Exception as e:
+            self.logger.error(f"Failed to read {filepath}: {e}")
+            return FileResponse(FileError.READ_FAIL)
+
+    def review(self, scan_id: str, fingerprint_id: str) -> ReviewResponse:
+        if not self.gemini_ops:
+            return ReviewResponse(ReviewError.NO_API_KEY)
+
+        sarif = self.mongo.get_sarif_by_id(scan_id)
+        if not sarif:
+            self.logger.error(f"sarif not found for scan id {scan_id}")
+            return ReviewResponse(ReviewError.SCAN_NOT_FOUND)
+
+        finding: Optional[Dict[str, Any]] = self.get_finding_by_fingerprint(
+            sarif, fingerprint_id
+        )
+        if not finding:
+            return ReviewResponse(ReviewError.NO_FINDING)
+
+        location: LocationFromSarif = self.get_location_from_finding(finding)
+        if not location.filepath or not location.snippet or not location.description:
+            self.logger.error(f"incomplete finding {asdict(location)}")
+            return ReviewResponse(ReviewError.INCOMPLETE_FINDING)
+
+        file = self.get_file(location.filepath)
+
+        finding_for_review: FindingForReview = FindingForReview(
+            finding["ruleId"], location.snippet, location.description
+        )
+
+        if file and file.file:
+            try:
+                gemini_response: ReviewResponse = self.gemini_ops.review(
+                    finding_for_review, file.file
+                )
+
+                if not gemini_response.error:
+                    finding["aiReview"] = {
+                        "verdict": gemini_response.review.verdict,  # type: ignore
+                        "reason": gemini_response.review.reason,  # type: ignore
+                    }
+
+                    self.mongo.update_scan_by_id(scan_id, sarif)
+
+                return gemini_response
+            except RuntimeError as e:
+                self.logger.error(f"Gemini review failed: {e}")
+                return ReviewResponse(ReviewError.REVIEW_FAIL)
+        else:
+            self.logger.error(f"file read error {file.error.value}")  # type: ignore
+            return ReviewResponse(ReviewError.INCOMPLETE_FINDING)
 
     def clone_repo(self, repo_url: str) -> Path:
         # Use last two parts of repo for folder name (e.g., github.com/rs/cors -> rs_cors)
@@ -138,24 +248,6 @@ class Scanner:
             return ""
 
         return result.stdout
-
-    def mark_sarif_suppressed_by_fingerprint(
-        self, scan_id: str, fingerprint_id: str, suppress: bool = True
-    ) -> Dict[str, Any]:
-        sarif = self.mongo.get_sarif_by_id(scan_id)
-        if not sarif:
-            raise ValueError(f"SARIF not found for scan ID {scan_id}")
-
-        # Update matching results
-        for run in sarif.get("runs", []):
-            for result in run.get("results", []):
-                fingerprints = result.get("fingerprints", {})
-                if fingerprints.get("paladin") == fingerprint_id:
-                    result["suppressed"] = suppress
-
-        self.mongo.update_scan_by_id(scan_id, sarif)
-
-        return sarif
 
     def delete_repo_if_no_findings(self, repo_dir: Path, semgrep_output: str) -> None:
         """
@@ -282,3 +374,28 @@ class Scanner:
     def should_suppress_findings(self) -> bool:
         settings = self.config.get("settings", {})
         return not settings.get("suppress_paths") or not settings.get("suppress_rules")
+
+    def get_finding_by_fingerprint(
+        self, sarif: Dict[str, Any], fingerprint_id: str
+    ) -> Optional[Dict[str, Any]]:
+        # there should be only 1 finding per fingerprint
+        # if that is not the case, fix the fingerprint function
+        for run in sarif.get("runs", []):
+            for result in run.get("results", {}):
+                fingerprints = result.get("fingerprints", {})
+                if fingerprints.get("paladin") == fingerprint_id:
+                    return result
+
+        return None
+
+    def get_location_from_finding(self, finding: Dict[str, Any]) -> LocationFromSarif:
+        locations: List[Dict[str, Any]] = finding.get("locations", [])
+        if not locations:
+            return LocationFromSarif("", "", "")
+
+        physical_location = locations[0]["physicalLocation"]
+        filepath = physical_location["artifactLocation"]["uri"]
+        snippet = physical_location["region"]["snippet"]["text"]
+        desc = finding.get("message", {}).get("text", "")
+
+        return LocationFromSarif(filepath, snippet, desc)

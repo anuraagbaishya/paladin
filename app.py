@@ -2,15 +2,16 @@ import logging
 import os
 import sys
 import threading
-from pathlib import Path
+from dataclasses import asdict
 from typing import Tuple, Union
 
 from flask import Flask, Response, jsonify, render_template, request
 
-from models.models import Job
-from scanner.scan import Scanner
+from models.data_models import Job
+from models.response_models import (FileError, FileResponse, ReviewError,
+                                    ReviewResponse)
 from refresher.refresh import Refresher
-
+from scanner.scan import Scanner
 from utils.config_verifier import ConfigVerifier
 from utils.mongo_utils import MongoUtils
 
@@ -106,33 +107,42 @@ def refresh_reports() -> Union[Response, Tuple]:
     return jsonify({"status": "OK"})
 
 
-@app.route("/api/file", methods=["POST"])
-def get_file():
+@app.route("/api/scan/file", methods=["POST"])
+def get_file() -> Union[Response, Tuple]:
     data = request.get_json()
-    if not data or "file_path" not in data:
-        return jsonify({"error": "file_path missing in request body"}), 400
+    if not data or "filepath" not in data:
+        return jsonify({"error": "filepath missing in request body"}), 400
 
-    file_path = data["file_path"]
-    base_path = Path(config["paths"]["clone_base_dir"]).resolve()  # type: ignore
-    requested_path = Path(file_path).resolve()
+    file_response: FileResponse = scanner.get_file(data["filepath"])
 
-    # Ensure requested_path is inside base_path
-    try:
-        if os.path.commonpath([str(base_path), str(requested_path)]) != str(base_path):
-            return jsonify({"error": "Invalid file path"}), 400
-    except ValueError:
-        return jsonify({"error": "Invalid file path"}), 400
+    if file_response.error:
+        if file_response.error == FileError.INVALID_PATH:
+            return jsonify(file_response.to_dict()), 400
+        elif file_response.error == FileError.NOT_FOUND:
+            return jsonify(file_response.to_dict()), 404
+        else:
+            return jsonify(file_response.to_dict()), 500
 
-    if not requested_path.is_file():
-        return jsonify({"error": "File does not exist"}), 404
+    return jsonify(file_response.to_dict()), 200
 
-    try:
-        with requested_path.open("r", encoding="utf-8", errors="replace") as f:
-            lines = f.readlines()
-    except Exception as e:
-        return jsonify({"error": f"Failed to read file: {e}"}), 500
 
-    return jsonify({"file": lines})
+@app.route("/api/scan/review", methods=["POST"])
+def review() -> Union[Response, Tuple]:
+    data = request.get_json()
+    if not data or "scan_id" not in data or "fingerprint_id" not in data:
+        return jsonify({"error": "both scan_id and fingerprint_id are needed"}), 400
+
+    review_response: ReviewResponse = scanner.review(
+        data["scan_id"], data["fingerprint_id"]
+    )
+
+    if review_response.error:
+        if review_response.error == ReviewError.SCAN_NOT_FOUND:
+            return jsonify(review_response.to_dict()), 404
+        else:
+            return jsonify(review_response.to_dict()), 500
+
+    return jsonify(review_response.to_dict()), 200
 
 
 if __name__ == "__main__":

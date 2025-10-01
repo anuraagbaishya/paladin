@@ -7,7 +7,7 @@ from bson import ObjectId
 from pymongo import MongoClient
 from pymongo.results import DeleteResult
 
-from models.models import Job, JobStatus, ScanResult, Cwe, VulnReport
+from models.data_models import Cwe, Job, JobStatus, ScanResult, VulnReport
 
 
 class MongoUtils:

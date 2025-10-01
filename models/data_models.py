@@ -63,3 +63,17 @@ class VulnReport:
     severity: str  # TODO: make this enum
     cvss_score: Optional[float]
     cvss_vector: Optional[str]
+
+
+@dataclass
+class FindingForReview:
+    rule_id: str
+    snippet: str
+    description: str
+
+
+@dataclass
+class LocationFromSarif:
+    filepath: str
+    snippet: str
+    description: str

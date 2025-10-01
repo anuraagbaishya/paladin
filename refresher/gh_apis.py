@@ -1,9 +1,10 @@
-import os
-from datetime import datetime, timedelta, timezone
-import requests
-from typing import Dict, Any, Optional, List
 import logging
-from models.models import RepoInfo
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Optional
+
+import requests
+
+from models.data_models import RepoInfo
 
 logging.basicConfig(level=logging.INFO)
 
