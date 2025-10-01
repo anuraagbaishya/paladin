@@ -1,4 +1,4 @@
-# Semgrep Runner
+# Paladin
 
 ## Features
 1. Fetch GHSAs and view them in the web UI
