@@ -36,6 +36,9 @@ npm run build
    1. Create a `config.toml` from `config.toml.sample`
    2. Add the required configurations as appropriate
 
+### MongoDB
+Paladin uses MongoDB as its database. To run Paladin you will have to set up MongoDB on your system.
+
 ## Usage
 
 Run the Flask app:
