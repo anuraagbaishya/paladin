@@ -2,7 +2,10 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional, Set
 
+from bson import ObjectId
+
 from models.data_models import Cwe, RepoInfo, VulnReport
+from models.enums import JobStatus
 from utils.mongo_utils import MongoUtils
 
 from .gh_apis import GhApis
@@ -17,12 +20,14 @@ class Refresher:
         self.token = token
         self.gh_apis = GhApis(token)
 
-    def refresh(self, days: int = 7) -> None:
+    def refresh(self, job_id: ObjectId, days: int = 7) -> None:
         self.logger.info(f"Querying GHSAs for last {days} days")
+        self.mongo.update_job_status(job_id, JobStatus.RUNNING)
 
         ghsas: Optional[List[Dict[str, Any]]] = self.gh_apis.query_recent_ghsa(days)
         if not ghsas:
             self.logger.info("No GHSAs queried")
+            self.mongo.update_job_status(job_id, JobStatus.DONE)
             return None
 
         self.logger.info(f"Queried {len(ghsas)} GHSAs")
@@ -48,6 +53,7 @@ class Refresher:
                     self.logger.error(f"Error processing vulnerability: {e}")
 
             self.logger.info(f"Upserted {count} GHSA entries into MongoDB")
+            self.mongo.update_job_status(job_id, JobStatus.DONE)
 
     def _process_vuln_node(
         self, ghsa: Dict[str, Any], vuln_node: Dict[str, Any], seen: Set[str]

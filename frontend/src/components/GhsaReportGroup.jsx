@@ -30,7 +30,7 @@ export default function GhsaReportGroup({ group, findings }) {
             const jobId = data.job_id;
 
             const poll = setInterval(async () => {
-                const statusResp = await fetch(`/scan_status/${jobId}`);
+                const statusResp = await fetch(`/job_status/${jobId}`);
                 const statusData = await statusResp.json();
                 if (statusData.status === "done" || statusData.status === "error") {
                     clearInterval(poll);

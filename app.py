@@ -1,15 +1,13 @@
 import logging
-import os
 import sys
 import threading
-from dataclasses import asdict
 from typing import Tuple, Union
 
+from bson import ObjectId
 from flask import Flask, Response, jsonify, render_template, request
 
-from models.data_models import Job
-from models.response_models import (FileError, FileResponse, ReviewError,
-                                    ReviewResponse)
+from models.response_models import (FileError, FileResponse, JobResponse,
+                                    ReviewError, ReviewResponse)
 from refresher.refresh import Refresher
 from scanner.scan import Scanner
 from utils.config_verifier import ConfigVerifier
@@ -27,7 +25,7 @@ def index(id=None) -> str:
 
 
 @app.route("/api/scan", methods=["POST"])
-def submit_scan():
+def submit_scan() -> Union[Response, Tuple]:
     data = request.json
     repo: str = data.get("repo")  # type: ignore
     repo_url: str = f"https://github.com/{repo}"
@@ -35,21 +33,26 @@ def submit_scan():
     if not repo_url:
         return jsonify({"error": "No repo provided"}), 400
 
-    job: Job = mongo_utils.add_job_to_db(repo_url)
+    job: JobResponse = JobResponse(repo_url)
+
+    job_id: ObjectId = mongo_utils.add_job_to_db(job)
+    job._id = job_id
 
     # Run scan in background thread
     threading.Thread(
         target=scanner.run_scan_job, args=(job._id, repo_url), daemon=True
     ).start()
 
-    return jsonify({"job_id": str(job._id)})
+    return jsonify(job.to_dict()), 200
 
 
 @app.route("/api/sarif/<id>")
-def get_sarif(id: str) -> Response:
+def get_sarif(id: str) -> Union[Response, Tuple]:
     data = mongo_utils.get_sarif_by_id(id)
-
-    return jsonify(data)
+    if data:
+        return jsonify(data), 200
+    else:
+        return jsonify({"error": "scan not found"}), 404
 
 
 @app.route("/api/sarif/<id>/suppress")
@@ -69,8 +72,8 @@ def get_scans_by_repo(repo) -> Response:
     return jsonify(results)
 
 
-@app.route("/api/vuln_reports")
-def get_vuln_reports():
+@app.route("/api/reports")
+def get_reports():
     reports = mongo_utils.get_reports_by_pkg()
 
     return jsonify(reports)
@@ -85,14 +88,12 @@ def delete_scan_by_id(id) -> Union[Response, Tuple]:
     return jsonify({"status": "OK"})
 
 
-@app.route("/scan_status/<job_id>")
+@app.route("/job_status/<job_id>")
 def get_scan_status(job_id) -> Union[Response, Tuple]:
     job = mongo_utils.get_job_by_id(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
-    return jsonify(
-        {"job_id": str(job._id), "status": job.status.value, "error": job.error}
-    )
+    return jsonify(job.to_dict()), 200
 
 
 @app.route("/api/refresh_reports")
@@ -102,9 +103,16 @@ def refresh_reports() -> Union[Response, Tuple]:
 
     days: int = int(request.args.get("days", 7))
 
-    threading.Thread(target=refresher.refresh, args=(days,), daemon=True).start()
+    job: JobResponse = JobResponse()
 
-    return jsonify({"status": "OK"})
+    job_id: ObjectId = mongo_utils.add_job_to_db(job)
+    job._id = job_id
+
+    threading.Thread(
+        target=refresher.refresh, args=(job._id, days), daemon=True
+    ).start()
+
+    return jsonify(job.to_dict()), 200
 
 
 @app.route("/api/scan/file", methods=["POST"])

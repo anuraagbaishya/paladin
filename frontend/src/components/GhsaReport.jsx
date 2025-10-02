@@ -59,7 +59,8 @@ export default function GhsaReport({ report, idBase, index }) {
         }
 
         if (report.cwe) {
-            const cweNum = report.cwe.id.split("-")[1]
+            console.log(report.cwe)
+            const cweNum = report.cwe?.id.split("-")[1]
             const link = (
                 <a
                     href={`https://cwe.mitre.org/data/definitions/${cweNum}.html`}

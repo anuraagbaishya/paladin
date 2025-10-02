@@ -1,14 +1,14 @@
 body {
   font-family: "Helvetica Light", 'Helvetica', Arial, sans-serif;
   font-weight: 300;
-  background-color: #010d1f;
+  background-color: #000000;
   color: #e0e0e0;
   margin: 0;
 }
 
 .app-banner {
   width: 100%;
-  background: #162b4b;
+  background: #101010;
   color: #ffffff;
   padding: 24px 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
@@ -41,7 +41,8 @@ body {
 
 .search-wrapper {
   position: relative;
-  /* display: inline-block; */
+  border: 1px solid #F24405;
+  border-radius: 5px;
 }
 
 .search-icon {
@@ -59,7 +60,7 @@ body {
   border: none;
   outline: none;
   font-size: .85em;
-  background: #1f3d6b;
+  background: #0d0d0d;
   color: #fff;
   min-width: 320px;
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.3);
@@ -80,7 +81,7 @@ body {
 }
 
 .shield-icon {
-  color: #90f923;
+  color: #F24405;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
   width: 32px;
   height: 32px;
@@ -88,7 +89,7 @@ body {
 }
 
 .report {
-  background-color: #162b4b;
+  background-color: #101010;
   border-radius: 8px;
   padding: 12px 16px;
   margin-bottom: 16px;
@@ -132,7 +133,7 @@ body {
   transition: transform 0.2s;
   font-size: 1.2em;
   margin-right: 8px;
-  color: #90f923;
+  color: #F24405;
 }
 
 .rotate {
@@ -146,8 +147,8 @@ body {
 }
 
 .scan-container button {
-  background-color: #90f923;
-  color: #010d1f;
+  background-color: #F24405;
+  color: #000000;
   border: none;
   border-radius: 4px;
   padding: 4px 10px;
@@ -192,8 +193,8 @@ button.get-scans-btn:disabled {
 }
 
 .spinner {
-  border: 2px solid #90f923;
-  border-top: 2px solid #010d1f;
+  border: 2px solid #F24405;
+  border-top: 2px solid #000000;
   border-radius: 50%;
   width: 14px;
   height: 14px;
@@ -250,15 +251,15 @@ button.get-scans-btn:disabled {
 
 
 .scan-result-area {
-  background-color: #162b4b;
+  background-color: #101010;
   border-radius: 8px;
   padding: 10px;
 }
 
 
 .delete-btn {
-  background-color: #90f923;
-  color: #010d1f;
+  background-color: #F24405;
+  color: #000000;
   border: none;
   border-radius: 4px;
   font-size: 0.9em;
@@ -269,7 +270,7 @@ button.get-scans-btn:disabled {
   align-items: stretch;
   border-radius: 6px;
   overflow: hidden;
-  border: 1px solid #90f923;
+  border: 1px solid #F24405;
   height: 36px;
   font-size: 0.95em;
 }
@@ -279,10 +280,10 @@ button.get-scans-btn:disabled {
   align-items: center;
   justify-content: center;
   padding: 0 12px;
-  background-color: #90f923;
-  color: #010d1f;
+  background-color: #F24405;
+  color: #000000;
   border: none;
-  border-right: 1px solid #010d1f;
+  border-right: 1px solid #000000;
   height: 100%;
   cursor: pointer;
   font-size: inherit;
@@ -295,14 +296,14 @@ button.get-scans-btn:disabled {
   gap: 4px;
   padding: 0 12px;
   height: 100%;
-  background-color: #90f923;
+  background-color: #F24405;
   flex-shrink: 0;
 }
 
 .days-display {
   cursor: pointer;
   font-weight: 500;
-  color: #010d1f;
+  color: #000000;
 }
 
 .days-input-inline {
@@ -311,9 +312,9 @@ button.get-scans-btn:disabled {
   padding: 0 4px;
   height: 28px;
   box-sizing: border-box;
-  border: 1px solid #010d1f;
+  border: 1px solid #000000;
   border-radius: 4px;
-  background-color: #1f3d6b;
+  background-color: #0d0d0d;
   color: #fff;
   font-size: inherit;
   text-align: center;
@@ -325,14 +326,14 @@ button.get-scans-btn:disabled {
   user-select: none;
   display: flex;
   align-items: center;
-  color: #010d1f;
+  color: #000000;
 }
 
 .refresh-alert {
   position: fixed;
   left: 50%;
   transform: translate(-50%, -50%);
-  background-color: #1f3d6b;
+  background-color: #0d0d0d;
   color: #fff;
   padding: 10px 16px;
   border-radius: 6px;
@@ -347,10 +348,9 @@ button.get-scans-btn:disabled {
   position: fixed;
   top: 0;
   right: -320px;
-  /* hidden by default */
   width: 300px;
   height: 100%;
-  background: #162b4b;
+  background: #101010;
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
   padding: 1rem;
   transition: right 0.3s ease-in-out;
@@ -374,7 +374,7 @@ button.get-scans-btn:disabled {
   border: none;
   font-size: 1em;
   cursor: pointer;
-  color: #90f923
+  color: #F24405
 }
 
 .filter-section {
@@ -388,12 +388,12 @@ button.get-scans-btn:disabled {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  padding: 6px;
+  gap: 4px;
+  padding: 10px;
   border-radius: 6px;
   cursor: pointer;
-  background: #90f923;
-  color: #010d1f;
+  background: #F24405;
+  color: #000000;
   font-size: 0.95em;
   border: none;
   transition: background 0.2s;
@@ -432,7 +432,7 @@ button.get-scans-btn:disabled {
 }
 
 .filter-section select {
-  background-color: #1f3d6b;
+  background-color: #0d0d0d;
   border: none;
   color: #fff;
   border-radius: 6px;
@@ -443,7 +443,7 @@ button.get-scans-btn:disabled {
 }
 
 .filter-section input[type="radio"] {
-  accent-color: #90f923;
+  accent-color: #F24405;
   width: 16px;
   height: 16px;
   cursor: pointer;
@@ -458,7 +458,7 @@ button.get-scans-btn:disabled {
 }
 
 .file-viewer {
-  background: #010d1f;
+  background: #1f1f1f;
   padding: 16px;
   border-radius: 8px;
   margin-top: 8px;
@@ -467,7 +467,7 @@ button.get-scans-btn:disabled {
 }
 
 .report-details button {
-  background-color: #90f923;
+  background-color: #F24405;
   border: none;
   padding: 4px 8px;
   margin-top: 4px;

@@ -13,9 +13,10 @@ from typing import Any, Dict, List, Optional, Set
 import git
 from bson import ObjectId
 
-from models.data_models import FindingForReview, JobStatus, LocationFromSarif
-from models.response_models import (FileError, FileResponse, ReviewError,
-                                    ReviewResponse)
+from models.data_models import FindingForReview, LocationFromSarif
+from models.enums import JobStatus
+from models.response_models import (FileError, FileResponse, JobResponse,
+                                    ReviewError, ReviewResponse)
 from utils.mongo_utils import MongoUtils
 
 from .gemini_ops import GeminiOps
@@ -78,7 +79,7 @@ class Scanner:
             self.logger.info(f"Scan complete for {repo_name}")
 
         except Exception as e:
-            self.mongo.update_job_on_error(job_id, str(e))
+            self.mongo.update_job_status(job_id, JobStatus.ERROR, str(e))
             self.logger.error(f"Scan failed for {repo_name} with error {e}")
 
     def mark_sarif_suppressed_by_fingerprint(

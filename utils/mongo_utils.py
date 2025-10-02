@@ -7,14 +7,16 @@ from bson import ObjectId
 from pymongo import MongoClient
 from pymongo.results import DeleteResult
 
-from models.data_models import Cwe, Job, JobStatus, ScanResult, VulnReport
+from models.data_models import Cwe, ScanResult, VulnReport
+from models.enums import JobStatus
+from models.response_models import JobResponse
 
 
 class MongoUtils:
     def __init__(self, config: Dict[str, Any]):
         self.mongo_path: str = config["mongo"]["mongo_path"]
         self.client: MongoClient = MongoClient(f"mongodb://{self.mongo_path}")
-        self.db = self.client.go_vuln_db
+        self.db = self.client.paladin
         self.vuln_reports_collection = self.db.vuln_reports
         self.scan_metadata = self.db.scan_metadata
         self.jobs_collection = self.db.scan_jobs
@@ -93,47 +95,33 @@ class MongoUtils:
             {"_id": ObjectId(id)}, {"$set": {"scan_result": sarif}}
         )
 
-    def add_job_to_db(self, repo_url: str) -> Job:
-        job = Job(repo_url)
+    def add_job_to_db(self, job: JobResponse) -> ObjectId:
+        print(job.to_dict())
+        result = self.jobs_collection.insert_one(job.to_dict())
 
-        job_as_dict = asdict(job)
-        job_as_dict["status"] = job_as_dict["status"].value
-        job_as_dict.pop("_id", None)
+        return result.inserted_id
 
-        result = self.jobs_collection.insert_one(job_as_dict)
-        job._id = result.inserted_id
-        return job
-
-    def update_job_status(self, job_id: ObjectId, status: JobStatus) -> None:
+    def update_job_status(
+        self, job_id: ObjectId, status: JobStatus, error: Optional[str] = None
+    ) -> None:
         self.jobs_collection.update_one(
             {"_id": job_id},
             {
                 "$set": {
                     "status": status.value,
-                    "updated_at": datetime.now(timezone.utc),
-                }
-            },
-        )
-
-    def update_job_on_error(self, job_id: ObjectId, error: str):
-        self.jobs_collection.update_one(
-            {"_id": job_id},
-            {
-                "$set": {
-                    "status": JobStatus.ERROR.value,
                     "error": error,
                     "updated_at": datetime.now(timezone.utc),
                 }
             },
         )
 
-    def get_job_by_id(self, job_id: str) -> Optional[Job]:
+    def get_job_by_id(self, job_id: str) -> Optional[JobResponse]:
         res = self.jobs_collection.find_one({"_id": ObjectId(job_id)})
         if not res:
             return None
 
         res["status"] = JobStatus(res["status"])
-        return Job(**res)
+        return JobResponse(**res)
 
     def upsert_vuln_report_to_db(self, report: VulnReport):
         self.vuln_reports_collection.update_one(

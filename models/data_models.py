@@ -1,16 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Any, Dict, Optional
-
-from bson import ObjectId
-
-
-class JobStatus(Enum):
-    PENDING = "pending"
-    DONE = "done"
-    ERROR = "error"
-    RUNNING = "running"
 
 
 @dataclass
@@ -18,20 +8,6 @@ class ScanResult:
     repo: str
     scan_result: Dict[str, Any]  # SARIF is stored as a generic dict
     timestamp: int = field(
-        default_factory=lambda: int(datetime.now(timezone.utc).timestamp())
-    )
-
-
-@dataclass
-class Job:
-    repo: str
-    error: Optional[str] = None
-    _id: Optional[ObjectId] = None
-    status: JobStatus = JobStatus.PENDING
-    created_at: int = field(
-        default_factory=lambda: int(datetime.now(timezone.utc).timestamp())
-    )
-    updated_at: int = field(
         default_factory=lambda: int(datetime.now(timezone.utc).timestamp())
     )
 

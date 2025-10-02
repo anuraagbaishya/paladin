@@ -1,23 +1,12 @@
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
+from bson import ObjectId
 from pydantic import BaseModel
 
-
-class FileError(Enum):
-    INVALID_PATH = "invalid file path"
-    NOT_FOUND = "file not found"
-    READ_FAIL = "failed to read file"
-
-
-class ReviewError(Enum):
-    REVIEW_FAIL = "gemini review failed"
-    SCAN_NOT_FOUND = "scan not found for given scan id"
-    NO_FINDING = "no finding found for provided scan id and fingerprint id"
-    INCOMPLETE_FINDING = "finding is missing required fields"
-    NO_ANSWER = "no response from gemini"
-    NO_API_KEY = "gemini api key not configured"
+from .enums import FileError, JobStatus, ReviewError
 
 
 @dataclass
@@ -51,4 +40,26 @@ class ReviewResponse:
         if isinstance(self.error, Enum):
             d["error"] = self.error.value
 
+        return d
+
+
+@dataclass
+class JobResponse:
+    repo: Optional[str] = None
+    error: Optional[str] = None
+    _id: Optional[ObjectId] = None
+    status: JobStatus = JobStatus.PENDING
+    created_at: int = field(
+        default_factory=lambda: int(datetime.now(timezone.utc).timestamp())
+    )
+    updated_at: int = field(
+        default_factory=lambda: int(datetime.now(timezone.utc).timestamp())
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        d = asdict(self)
+        if isinstance(self.status, Enum):
+            d["status"] = self.status.value
+        if isinstance(self._id, ObjectId):
+            d["_id"] = str(self._id)
         return d

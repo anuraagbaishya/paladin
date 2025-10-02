@@ -20,7 +20,7 @@ export default function IndexPage() {
     useEffect(() => {
         async function loadReports() {
             try {
-                const resp = await fetch("/api/vuln_reports");
+                const resp = await fetch("/api/reports");
                 const data = await resp.json();
                 setGroups(data);
             } catch (err) {
