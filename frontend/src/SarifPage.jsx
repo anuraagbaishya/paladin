@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import SarifReportGroup from "./components/SarifReportGroup";
+import { Link } from "react-router-dom";
 
 export default function SarifPage() {
     const { id } = useParams();
@@ -32,18 +33,20 @@ export default function SarifPage() {
         <div className="app-container">
             <header className="app-banner">
                 <div className="banner-content">
-                    {/* Shield icon */}
-                    <svg
-                        className="shield-icon"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="32"
-                        height="32"
-                    >
-                        <path d="M12 2L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-3z" />
-                    </svg>
-                    <h1>PALADIN</h1>
+                    <Link to="/" className="logo-link">
+                        {/* Shield icon */}
+                        <svg
+                            className="shield-icon"
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            width="32"
+                            height="32"
+                        >
+                            <path d="M12 2L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-3z" />
+                        </svg>
+                        <h1>PALADIN</h1>
+                    </Link>
                 </div>
             </header>
 

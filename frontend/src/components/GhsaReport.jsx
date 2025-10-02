@@ -59,7 +59,6 @@ export default function GhsaReport({ report, idBase, index }) {
         }
 
         if (report.cwe) {
-            console.log(report.cwe)
             const cweNum = report.cwe?.id.split("-")[1]
             const link = (
                 <a

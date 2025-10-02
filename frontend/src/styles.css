@@ -331,11 +331,12 @@ button.get-scans-btn:disabled {
 
 .refresh-alert {
   position: fixed;
+  top: 15%;
   left: 50%;
   transform: translate(-50%, -50%);
   background-color: #0d0d0d;
-  color: #fff;
-  padding: 10px 16px;
+  color: #F24405;
+  padding: 10px;
   border-radius: 6px;
   font-size: 1.1em;
   opacity: 0.9;
@@ -474,4 +475,12 @@ button.get-scans-btn:disabled {
   cursor: pointer;
   border-radius: 4px;
   font-size: 0.90em;
+}
+
+.logo-link {
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
 }

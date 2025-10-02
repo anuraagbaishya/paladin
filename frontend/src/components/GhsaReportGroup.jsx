@@ -23,14 +23,16 @@ export default function GhsaReportGroup({ group, findings }) {
             if (!resp.ok) {
                 setScanningRepos((prev) => ({ ...prev, [repo]: false }));
                 setScanMessages((prev) => ({ ...prev, [repo]: `Error: ${data.error}` }));
+                console.error(`Scan failed ${data.error}`)
                 setTimeout(() => setScanMessages((prev) => ({ ...prev, [repo]: "" })), 10000);
                 return;
             }
 
-            const jobId = data.job_id;
+            const jobId = data._id;
+            console.log(`Scan job started ${jobId}`)
 
             const poll = setInterval(async () => {
-                const statusResp = await fetch(`/job_status/${jobId}`);
+                const statusResp = await fetch(`/api/job_status/${jobId}`);
                 const statusData = await statusResp.json();
                 if (statusData.status === "done" || statusData.status === "error") {
                     clearInterval(poll);
@@ -40,7 +42,7 @@ export default function GhsaReportGroup({ group, findings }) {
                 }
             }, 5000);
         } catch (err) {
-            console.error(err);
+            console.error(`Scan failed ${err}`)
             setScanningRepos((prev) => ({ ...prev, [repo]: false }));
             setScanMessages((prev) => ({ ...prev, [repo]: `Error: ${err}` }));
             setTimeout(() => setScanMessages((prev) => ({ ...prev, [repo]: "" })), 10000);
@@ -69,7 +71,6 @@ export default function GhsaReportGroup({ group, findings }) {
     };
 
     const displayFindings = findings ?? group.findings;
-    console.log(group)
 
     return (
         <div className="report-group">

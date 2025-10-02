@@ -18,4 +18,17 @@ export default defineConfig({
         manifest: false,
     },
     base: './',
+    server: {
+        host: true,
+        proxy: {
+            '/api': {
+                target: 'http://paladin-backend:9001',
+                changeOrigin: true,
+            },
+            '/job_status': {
+                target: 'http://paladin-backend:9001',
+                changeOrigin: true,
+            },
+        },
+    },
 });

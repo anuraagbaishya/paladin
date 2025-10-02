@@ -13,11 +13,27 @@ from scanner.scan import Scanner
 from utils.config_verifier import ConfigVerifier
 from utils.mongo_utils import MongoUtils
 
+# --- Initialize app and logger ---
 app = Flask(__name__)
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
+# --- Initialize configuration and services at module level ---
+verifier: ConfigVerifier = ConfigVerifier("config.toml")
+config = verifier.verify()
 
+if not config:
+    sys.exit(1)
+
+mongo_utils: MongoUtils = MongoUtils(config)
+deployment = config["deployment"]
+github_token = config.get("tokens", {}).get("github_token", None)
+
+scanner: Scanner = Scanner(config, mongo_utils)
+refresher: Refresher = Refresher(github_token, mongo_utils)
+
+
+# --- Routes ---
 @app.route("/")
 @app.route("/sarif/<id>")
 def index(id=None) -> str:
@@ -34,11 +50,9 @@ def submit_scan() -> Union[Response, Tuple]:
         return jsonify({"error": "No repo provided"}), 400
 
     job: JobResponse = JobResponse(repo_url)
-
     job_id: ObjectId = mongo_utils.add_job_to_db(job)
     job._id = job_id
 
-    # Run scan in background thread
     threading.Thread(
         target=scanner.run_scan_job, args=(job._id, repo_url), daemon=True
     ).start()
@@ -61,21 +75,18 @@ def suppress_finding(id: str) -> Response:
     sarif_with_suppressions = scanner.mark_sarif_suppressed_by_fingerprint(
         id, fingerprint, True
     )
-
     return jsonify(sarif_with_suppressions)
 
 
 @app.route("/api/scans/<path:repo>")
 def get_scans_by_repo(repo) -> Response:
     results = mongo_utils.get_scans_from_db(repo)
-
     return jsonify(results)
 
 
 @app.route("/api/reports")
 def get_reports():
     reports = mongo_utils.get_reports_by_pkg()
-
     return jsonify(reports)
 
 
@@ -84,11 +95,10 @@ def delete_scan_by_id(id) -> Union[Response, Tuple]:
     count = mongo_utils.delete_scan_by_id(id)
     if not count:
         return jsonify({"error": "Job not found"}), 404
-
     return jsonify({"status": "OK"})
 
 
-@app.route("/job_status/<job_id>")
+@app.route("/api/job_status/<job_id>")
 def get_scan_status(job_id) -> Union[Response, Tuple]:
     job = mongo_utils.get_job_by_id(job_id)
     if not job:
@@ -104,7 +114,6 @@ def refresh_reports() -> Union[Response, Tuple]:
     days: int = int(request.args.get("days", 7))
 
     job: JobResponse = JobResponse()
-
     job_id: ObjectId = mongo_utils.add_job_to_db(job)
     job._id = job_id
 
@@ -151,20 +160,3 @@ def review() -> Union[Response, Tuple]:
             return jsonify(review_response.to_dict()), 500
 
     return jsonify(review_response.to_dict()), 200
-
-
-if __name__ == "__main__":
-    verifier: ConfigVerifier = ConfigVerifier("config.toml")
-    config = verifier.verify()
-
-    if not config:
-        sys.exit(1)
-
-    mongo_utils: MongoUtils = MongoUtils(config)
-    deployment = config["deployment"]
-    github_token = config.get("tokens", {}).get("github_token", None)
-
-    scanner: Scanner = Scanner(config, mongo_utils)
-    refresher: Refresher = Refresher(github_token, mongo_utils)
-
-    app.run(debug=True, host=deployment["host"], port=deployment["port"])

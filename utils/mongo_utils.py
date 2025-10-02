@@ -14,7 +14,7 @@ from models.response_models import JobResponse
 
 class MongoUtils:
     def __init__(self, config: Dict[str, Any]):
-        self.mongo_path: str = config["mongo"]["mongo_path"]
+        self.mongo_path: str = "mongo:27017"
         self.client: MongoClient = MongoClient(f"mongodb://{self.mongo_path}")
         self.db = self.client.paladin
         self.vuln_reports_collection = self.db.vuln_reports
@@ -96,8 +96,10 @@ class MongoUtils:
         )
 
     def add_job_to_db(self, job: JobResponse) -> ObjectId:
-        print(job.to_dict())
-        result = self.jobs_collection.insert_one(job.to_dict())
+        job_dict: Dict[str, Any] = job.to_dict()
+        job_dict.pop("_id")
+
+        result = self.jobs_collection.insert_one(job_dict)
 
         return result.inserted_id
 

@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import GhsaReportGroup from "./components/GhsaReportGroup";
 import Header from "./components/Header";
 import FilterPanel from "./components/FilterPanel";
-import filterIcon from "./assets/filter.png";
 import "./styles.css";
 
 export default function IndexPage() {
@@ -17,17 +16,82 @@ export default function IndexPage() {
     const [severityFilter, setSeverityFilter] = useState("all");
     const [showFilters, setShowFilters] = useState(false);
 
-    useEffect(() => {
-        async function loadReports() {
-            try {
-                const resp = await fetch("/api/reports");
-                const data = await resp.json();
-                setGroups(data);
-            } catch (err) {
-                console.error("Error loading reports:", err);
-                setError("Failed to load reports.");
+    const pollJobStatus = (jobId, interval = 5000) => {
+        return new Promise((resolve, reject) => {
+            const poll = setInterval(async () => {
+                try {
+                    const res = await fetch(`/api/job_status/${jobId}`);
+                    const data = await res.json();
+
+                    if (!res.ok) {
+                        clearInterval(poll);
+                        return reject(data.error || "Failed to get job status");
+                    }
+
+                    if (data.status === "done") {
+                        clearInterval(poll);
+                        resolve(data);
+                    } else if (data.status === "error") {
+                        clearInterval(poll);
+                        reject(data);
+                    }
+                } catch (err) {
+                    clearInterval(poll);
+                    reject(err);
+                }
+            }, interval);
+        });
+    };
+
+    const handleRefresh = async (refreshDays = days) => {
+        try {
+            setShowAlert("pending");
+
+            const resp = await fetch(`/api/refresh_reports?days=${refreshDays}`);
+            const data = await resp.json();
+
+            if (!resp.ok) {
+                console.error("Refresh failed:", data.error || data);
+                setShowAlert(false);
+                return;
             }
+
+            const jobId = data._id;
+            console.log("Refresh job started:", jobId);
+
+            try {
+                await pollJobStatus(jobId);
+                console.log("Refresh complete");
+
+                await loadReports();
+
+                setShowAlert("done");
+                setTimeout(() => setShowAlert(false), 3000);
+            } catch (err) {
+                console.error("Refresh errored:", err);
+                setShowAlert("error");
+                setTimeout(() => setShowAlert(false), 3000);
+            }
+
+        } catch (err) {
+            console.error("Failed to refresh reports", err);
+            setShowAlert(false);
         }
+    };
+
+
+    const loadReports = async () => {
+        try {
+            const resp = await fetch("/api/reports");
+            const data = await resp.json();
+            setGroups(data);
+        } catch (err) {
+            console.error("Error loading reports:", err);
+            setError("Failed to load reports.");
+        }
+    };
+
+    useEffect(() => {
         loadReports();
     }, []);
 
@@ -54,52 +118,24 @@ export default function IndexPage() {
         })
         .filter(group => group.findings.length > 0);
 
-    const handleRefresh = async (refreshDays = days) => {
-        try {
-            setShowAlert(true);
-            await fetch(`/api/refresh_reports?days=${refreshDays}`);
-            setTimeout(() => setShowAlert(false), 2000);
-        } catch (err) {
-            console.error("Failed to refresh reports", err);
-            setShowAlert(false);
-        }
-    };
-
     return (
         <div className="app-container">
             <Header
                 days={days} setDays={setDays}
                 editingDays={editingDays} setEditingDays={setEditingDays}
                 handleRefresh={handleRefresh}
-            >
-                {/* Small components stay here */}
-                <div className="search-wrapper">
-                    <svg
-                        className="search-icon"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        width="16"
-                        height="16"
-                    >
-                        <path d="M10 2a8 8 0 105.293 14.707l4.387 4.386 1.414-1.414-4.386-4.387A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z" />
-                    </svg>
-                    <input
-                        type="text"
-                        placeholder="Search across all repos..."
-                        value={query}
-                        onChange={(e) => setQuery(e.target.value)}
-                        className="search-input"
-                    />
+                query={query} setQuery={setQuery}
+                setShowFilters={setShowFilters}
+            />
+
+            {showAlert && (
+                <div className="refresh-alert">
+                    {showAlert === "pending" && "Refreshing..."}
+                    {showAlert === "done" && "Refresh complete!"}
+                    {showAlert === "error" && "Refresh failed!"}
                 </div>
+            )}
 
-                <button className="filters-button" onClick={() => setShowFilters(true)}>
-                    <img src={filterIcon} className="filters-icon" />
-                    Filters
-                </button>
-            </Header>
-
-            {showAlert && <div className="refresh-alert">Refreshing...</div>}
 
             <FilterPanel
                 showFilters={showFilters} setShowFilters={setShowFilters}

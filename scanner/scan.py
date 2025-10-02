@@ -15,8 +15,8 @@ from bson import ObjectId
 
 from models.data_models import FindingForReview, LocationFromSarif
 from models.enums import JobStatus
-from models.response_models import (FileError, FileResponse, JobResponse,
-                                    ReviewError, ReviewResponse)
+from models.response_models import (FileError, FileResponse, ReviewError,
+                                    ReviewResponse)
 from utils.mongo_utils import MongoUtils
 
 from .gemini_ops import GeminiOps
@@ -49,6 +49,8 @@ class Scanner:
             )
         else:
             self.gemini_ops = None
+        if not self.clone_base_dir.exists():
+            os.makedirs(self.clone_base_dir, exist_ok=True)
 
     def run_scan_job(self, job_id: ObjectId, repo_url: str) -> None:
         """
@@ -56,6 +58,7 @@ class Scanner:
         """
 
         self.mongo.update_job_status(job_id, JobStatus.RUNNING)
+        repo_name: str = f"{repo_url.split("/")[-2]}/{repo_url.split("/")[-1]}"
 
         try:
             # Clone the repo
@@ -65,14 +68,13 @@ class Scanner:
             cleaned_output: Dict[str, Any] = self.clean_sarif(json.loads(output))
 
             repo_file_path: str = repo_path.name
-            repo_name: str = f"{repo_url.split("/")[-2]}/{repo_url.split("/")[-1]}"
 
             self.mongo.add_scan_result_to_db(repo_name, cleaned_output)
 
             self.write_sarif_to_file(cleaned_output, repo_file_path)
 
             # Delete if no findings
-            self.delete_repo_if_no_findings(repo_path, output)
+            self.delete_repo_if_no_findings(repo_path, cleaned_output)
 
             # Mark job done
             self.mongo.update_job_status(job_id, JobStatus.DONE)
@@ -178,11 +180,14 @@ class Scanner:
             self.logger.error(f"file read error {file.error.value}")  # type: ignore
             return ReviewResponse(ReviewError.INCOMPLETE_FINDING)
 
-    def clone_repo(self, repo_url: str) -> Path:
+    def clone_repo(self, repo_url: str, clone_base_dir: Optional[Path] = None) -> Path:
         # Use last two parts of repo for folder name (e.g., github.com/rs/cors -> rs_cors)
         parts = repo_url.rstrip("/").split("/")[-2:]
-        safe_name = "_".join(re.sub(r"[^a-zA-Z0-9_\-]", "_", p) for p in parts)
-        clone_dir = self.clone_base_dir / safe_name
+        safe_name = "/".join(re.sub(r"[^a-zA-Z0-9_\-]", "_", p) for p in parts)
+        if not clone_base_dir:
+            clone_base_dir = self.clone_base_dir
+
+        clone_dir = clone_base_dir / safe_name
 
         if clone_dir.exists():
             shutil.rmtree(clone_dir)
@@ -250,11 +255,15 @@ class Scanner:
 
         return result.stdout
 
-    def delete_repo_if_no_findings(self, repo_dir: Path, semgrep_output: str) -> None:
+    def delete_repo_if_no_findings(
+        self, repo_dir: Path, semgrep_output: Dict[str, Any]
+    ) -> None:
         """
         Delete the repo directory if Semgrep found no issues.
         """
-        if not semgrep_output.strip():
+        results: Dict[str, Any] = semgrep_output["runs"][0]["results"]
+
+        if not results:
             shutil.rmtree(repo_dir)
             self.logger.info(f"Deleted {repo_dir} (no findings)")
         else:

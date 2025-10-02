@@ -5,8 +5,7 @@ from pathlib import Path
 class ConfigVerifier:
     REQUIRED_STRUCTURE = {
         "paths": {"semgrep_rules_dir": str, "clone_base_dir": str},
-        "mongo": {"mongo_path": str},
-        "deployment": {"host": str, "port": int},
+        "deployment": {"host": str, "port": int, "workers": int},
     }
 
     def __init__(self, toml_path: str):
