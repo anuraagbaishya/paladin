@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { dracula } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 export default function FileViewer({ filePath, startLine, endLine }) {
     const [lines, setLines] = useState([]);
@@ -37,16 +37,15 @@ export default function FileViewer({ filePath, startLine, endLine }) {
     return (
         <SyntaxHighlighter
             language={language}
-            style={dracula}
+            style={vscDarkPlus}
             showLineNumbers
             wrapLines={true}  // required to style individual lines
             lineProps={(lineNumber) => {
-                if (lineNumber >= startLine && lineNumber <= endLine) {
-                    return { style: { backgroundColor: "rgba(240, 34, 6, 0.89)" } };
-                }
-                return {};
+                return lineNumber >= startLine && lineNumber <= endLine
+                    ? { style: { backgroundColor: "rgba(240, 34, 6, 0.3)" } }
+                    : {};
             }}
-            customStyle={{ background: "#010d1f", padding: "8px 0", fontSize: "0.9em" }}
+            customStyle={{ padding: "8px 0", fontSize: "0.9em" }}
         >
             {lines.join("")}
         </SyntaxHighlighter>

@@ -99,7 +99,7 @@ function SarifReport({ finding, onRemove }) {
                     </div>
                 )}
 
-                {showFile && file && <FileViewer filePath={file} />}
+                {showFile && file && <FileViewer filePath={file} startLine={startLine} endLine={endLine} />}
             </div>
         </div>
     );

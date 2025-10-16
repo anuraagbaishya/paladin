@@ -80,5 +80,5 @@ The SARIF Viewer provides these functionalities for each finding:
 
 ## TO DO
 
-* Add ability to toggle viewing suppressed results at rule level
+* Add ability to toggle viewing suppressed results at repo level
 * Add a feature to add repos directly to scan instead of requiring GitHub security advisory reports
