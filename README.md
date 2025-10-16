@@ -37,13 +37,17 @@ port = 9001
 workers = 4
 ```
 
-### 1. Build frontend and backend containers
+### 3. Build frontend and backend containers
+Install `toml-cli` to read `config.toml` from `Makefile`
+```
+pip install toml-cli
+```
 
 ```bash
 make up
 ```
 
-### 2. Access the app
+### 4. Access the app
 
 * Open `http://<HOST>:<PORT>` as configured in `config.toml` under `[deployment]`.
 * Default: [`http://127.0.0.1:9001`](http://127.0.0.1:9001)
