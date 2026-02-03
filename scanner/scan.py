@@ -20,6 +20,7 @@ from models.response_models import (FileError, FileResponse, ReviewError,
 from utils.mongo_utils import MongoUtils
 
 from .gemini_ops import GeminiOps
+from .joern_utils import JoernUtils
 
 logging.basicConfig(level=logging.INFO)
 
@@ -31,6 +32,7 @@ class Scanner:
         self.logger = logging.getLogger(__name__)
         self.semgrep_rules_dir: Path = Path(self.config["paths"]["semgrep_rules_dir"])
         self.clone_base_dir: Path = Path(self.config["paths"]["clone_base_dir"])
+        self.joern_utils = JoernUtils(self.clone_base_dir)
         self.exclude_langs: Optional[Set[str]] = (
             set(self.config["settings"]["exclude_langs"])
             if "exclude_langs" in config["settings"]
@@ -49,6 +51,7 @@ class Scanner:
             )
         else:
             self.gemini_ops = None
+
         if not self.clone_base_dir.exists():
             os.makedirs(self.clone_base_dir, exist_ok=True)
 
@@ -61,9 +64,8 @@ class Scanner:
         repo_name: str = f"{repo_url.split("/")[-2]}/{repo_url.split("/")[-1]}"
 
         try:
-            # Clone the repo
             repo_path: Path = self.clone_repo(repo_url)
-            # Run semgrep (writing output to file as before)
+
             output: str = self.run_semgrep(repo_path)
             cleaned_output: Dict[str, Any] = self.clean_sarif(json.loads(output))
 
@@ -90,9 +92,11 @@ class Scanner:
         """
         Mark SARIF results as suppressed based on a fingerprint.
         """
-        sarif = self.mongo.get_sarif_by_id(scan_id)
-        if not sarif:
+        scan = self.mongo.get_scan_by_id(scan_id)
+        if not scan:
             return None
+
+        sarif = scan.scan_result
 
         finding = self.get_finding_by_fingerprint(sarif, fingerprint_id)
         if not finding:
@@ -136,10 +140,12 @@ class Scanner:
         if not self.gemini_ops:
             return ReviewResponse(ReviewError.NO_API_KEY)
 
-        sarif = self.mongo.get_sarif_by_id(scan_id)
-        if not sarif:
+        scan = self.mongo.get_scan_by_id(scan_id)
+        if not scan:
             self.logger.error(f"sarif not found for scan id {scan_id}")
             return ReviewResponse(ReviewError.SCAN_NOT_FOUND)
+
+        sarif: dict[str, Any] = scan.scan_result
 
         finding: Optional[Dict[str, Any]] = self.get_finding_by_fingerprint(
             sarif, fingerprint_id
@@ -152,36 +158,60 @@ class Scanner:
             self.logger.error(f"incomplete finding {asdict(location)}")
             return ReviewResponse(ReviewError.INCOMPLETE_FINDING)
 
-        file = self.get_file(location.filepath)
+        file: FileResponse = self.get_file(location.filepath)
 
         finding_for_review: FindingForReview = FindingForReview(
             finding["ruleId"], location.snippet, location.description
         )
 
-        if file and file.file:
-            try:
-                gemini_response: ReviewResponse = self.gemini_ops.review(
-                    finding_for_review, file.file
-                )
+        joern_trace = self.get_joern_trace(location.filepath, scan.repo, finding)
 
-                if not gemini_response.error:
-                    finding["aiReview"] = {
-                        "verdict": gemini_response.review.verdict,  # type: ignore
-                        "reason": gemini_response.review.reason,  # type: ignore
-                    }
-
-                    self.mongo.update_scan_by_id(scan_id, sarif)
-
-                return gemini_response
-            except RuntimeError as e:
-                self.logger.error(f"Gemini review failed: {e}")
-                return ReviewResponse(ReviewError.REVIEW_FAIL)
-        else:
+        if not (joern_trace and file and file.file):
             self.logger.error(f"file read error {file.error.value}")  # type: ignore
             return ReviewResponse(ReviewError.INCOMPLETE_FINDING)
 
+        try:
+            if joern_trace:
+                gemini_response: ReviewResponse = self.gemini_ops.review(
+                    finding_for_review, joern_trace, None
+                )
+            else:
+                gemini_response: ReviewResponse = self.gemini_ops.review(
+                    finding_for_review, None, file.file
+                )
+
+            if gemini_response.error:
+                self.logger.error(f"Gemini response failed: {gemini_response.error}")
+                return ReviewResponse(ReviewError.REVIEW_FAIL)
+
+            if not gemini_response.review:
+                self.logger.error("Gemini response failed, no review received")
+                return ReviewResponse(ReviewError.REVIEW_FAIL)
+
+            finding["aiReview"] = {
+                "verdict": gemini_response.review.verdict,
+                "reason": gemini_response.review.reason,
+            }
+
+            self.mongo.update_scan_by_id(scan_id, sarif)
+
+            return gemini_response
+        except RuntimeError as e:
+            self.logger.error(f"Gemini review failed: {e}")
+            return ReviewResponse(ReviewError.REVIEW_FAIL)
+
+    def get_joern_trace(self, filepath: str, repo: str, finding: dict[str, Any]):
+        extension = Path(filepath).suffix[1:]
+        if extension not in ["py", "js"]:
+            return None
+
+        if extension == "py":
+            return self.joern_utils.get_trace(repo, finding, language="python")
+        else:
+            return self.joern_utils.get_trace(repo, finding, language="javascript")
+
     def clone_repo(self, repo_url: str, clone_base_dir: Optional[Path] = None) -> Path:
-        # Use last two parts of repo for folder name (e.g., github.com/rs/cors -> rs_cors)
+        # Use last two parts of repo for folder name (e.g., github.com/rs/cors -> rs/cors)
         parts = repo_url.rstrip("/").split("/")[-2:]
         safe_name = "/".join(re.sub(r"[^a-zA-Z0-9_\-]", "_", p) for p in parts)
         if not clone_base_dir:
@@ -192,6 +222,7 @@ class Scanner:
         if clone_dir.exists():
             shutil.rmtree(clone_dir)
 
+        self.logger.info(f"Cloning repo {repo_url}")
         git.Repo.clone_from(repo_url, str(clone_dir))
         return clone_dir
 
@@ -220,6 +251,7 @@ class Scanner:
         Runs a single semgrep command with multiple -f flags.
         """
         languages = self.detect_languages(target_dir)
+
         languages = [lang.lower() for lang in languages]
 
         valid_rule_dirs = []

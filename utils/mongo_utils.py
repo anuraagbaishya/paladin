@@ -14,7 +14,7 @@ from models.response_models import JobResponse
 
 class MongoUtils:
     def __init__(self, config: Dict[str, Any]):
-        self.mongo_path: str = "mongo:27017"
+        self.mongo_path: str = "localhost:27017"
         self.client: MongoClient = MongoClient(f"mongodb://{self.mongo_path}")
         self.db = self.client.paladin
         self.vuln_reports_collection = self.db.vuln_reports
@@ -80,9 +80,12 @@ class MongoUtils:
 
         return results
 
-    def get_sarif_by_id(self, id: str) -> Dict[str, Any]:
-        sarif = self.scan_result_collection.find_one({"_id": ObjectId(id)})
-        return sarif["scan_result"]  # type: ignore
+    def get_scan_by_id(self, id: str) -> ScanResult | None:
+        scan = self.scan_result_collection.find_one({"_id": ObjectId(id)}, {"_id": 0})
+        if scan:
+            return ScanResult(**scan)
+        else:
+            return None
 
     def delete_scan_by_id(self, id: str) -> bool:
         result: DeleteResult = self.scan_result_collection.delete_one(

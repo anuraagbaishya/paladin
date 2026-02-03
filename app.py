@@ -1,14 +1,17 @@
 import logging
 import sys
 import threading
-from typing import Tuple, Union
+from pathlib import Path
+from typing import Tuple
 
 from bson import ObjectId
 from flask import Flask, Response, jsonify, render_template, request
 
+from models.data_models import ScanResult
 from models.response_models import (FileError, FileResponse, JobResponse,
                                     ReviewError, ReviewResponse)
 from refresher.refresh import Refresher
+from scanner.joern_utils import JoernUtils
 from scanner.scan import Scanner
 from utils.config_verifier import ConfigVerifier
 from utils.mongo_utils import MongoUtils
@@ -41,7 +44,7 @@ def index(id=None) -> str:
 
 
 @app.route("/api/scan", methods=["POST"])
-def submit_scan() -> Union[Response, Tuple]:
+def submit_scan() -> tuple[Response, int]:
     data = request.json
     repo: str = data.get("repo")  # type: ignore
     repo_url: str = f"https://github.com/{repo}"
@@ -61,12 +64,12 @@ def submit_scan() -> Union[Response, Tuple]:
 
 
 @app.route("/api/sarif/<id>")
-def get_sarif(id: str) -> Union[Response, Tuple]:
-    data = mongo_utils.get_sarif_by_id(id)
+def get_sarif(id: str) -> tuple[Response, int]:
+    data: ScanResult | None = mongo_utils.get_scan_by_id(id)
     if data:
-        return jsonify(data), 200
-    else:
-        return jsonify({"error": "scan not found"}), 404
+        return jsonify(data.scan_result), 200
+
+    return jsonify({"error": "scan not found"}), 404
 
 
 @app.route("/api/sarif/<id>/suppress")
@@ -91,15 +94,15 @@ def get_reports():
 
 
 @app.route("/api/scans/delete/<id>", methods=["DELETE"])
-def delete_scan_by_id(id) -> Union[Response, Tuple]:
+def delete_scan_by_id(id) -> tuple[Response, int]:
     count = mongo_utils.delete_scan_by_id(id)
     if not count:
         return jsonify({"error": "Job not found"}), 404
-    return jsonify({"status": "OK"})
+    return jsonify({"status": "OK"}), 200
 
 
 @app.route("/api/job_status/<job_id>")
-def get_scan_status(job_id) -> Union[Response, Tuple]:
+def get_scan_status(job_id) -> tuple[Response, int]:
     job = mongo_utils.get_job_by_id(job_id)
     if not job:
         return jsonify({"error": "Job not found"}), 404
@@ -107,7 +110,7 @@ def get_scan_status(job_id) -> Union[Response, Tuple]:
 
 
 @app.route("/api/refresh_reports")
-def refresh_reports() -> Union[Response, Tuple]:
+def refresh_reports() -> tuple[Response, int]:
     if not refresher.token:
         return jsonify({"error": "github token not configured"}), 400
 
@@ -125,7 +128,7 @@ def refresh_reports() -> Union[Response, Tuple]:
 
 
 @app.route("/api/scan/file", methods=["POST"])
-def get_file() -> Union[Response, Tuple]:
+def get_file() -> tuple[Response, int]:
     data = request.get_json()
     if not data or "filepath" not in data:
         return jsonify({"error": "filepath missing in request body"}), 400
@@ -144,7 +147,7 @@ def get_file() -> Union[Response, Tuple]:
 
 
 @app.route("/api/scan/review", methods=["POST"])
-def review() -> Union[Response, Tuple]:
+def review() -> tuple[Response, int]:
     data = request.get_json()
     if not data or "scan_id" not in data or "fingerprint_id" not in data:
         return jsonify({"error": "both scan_id and fingerprint_id are needed"}), 400
@@ -160,3 +163,14 @@ def review() -> Union[Response, Tuple]:
             return jsonify(review_response.to_dict()), 500
 
     return jsonify(review_response.to_dict()), 200
+
+
+@app.route("/api/scan/joern", methods=["POST"])
+def joern_analyze() -> tuple[Response, int]:
+    data = request.get_json()
+
+    joern = JoernUtils(Path(config["paths"]["clone_base_dir"]))
+
+    traces = joern.get_trace(data["repo"], data["finding"], data["lang"])
+
+    return jsonify(traces), 200

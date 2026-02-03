@@ -1,5 +1,5 @@
 import logging
-from typing import List
+from typing import Any, Optional
 
 from google import genai
 
@@ -16,15 +16,22 @@ class GeminiOps:
         self.client = genai.Client(api_key=api_key)
         self.model = model
 
-    def review(self, finding: FindingForReview, file: List[str]) -> ReviewResponse:
+    def review(
+        self,
+        finding: FindingForReview,
+        joern_trace: Optional[list[dict[str, Any]]],
+        file: Optional[list[str]],
+    ) -> ReviewResponse:
         prompt = f"""
             You are a security code analysis assistant. You will be given:
             1. A Semgrep finding (rule ID, explanation, and code line).
-            2. The full file content where the finding was reported.
+            2. The joern trace where the finding was reported OR
+               The file with the finding
+
 
             Your task:
             - Decide if the finding is a TRUE positive (real issue) or a FALSE positive.
-            - Use the file content as context to support your decision.
+            - Use the joern trace or file as context to support your decision.
 
             Your response will be a json of the format 
             {{
@@ -38,7 +45,10 @@ class GeminiOps:
             Explanation: {finding.description}
             Code line: {finding.snippet}
 
-            File content:
+            Joern Trace:
+            {joern_trace}
+
+            File:
             {file}
         """
         try:
