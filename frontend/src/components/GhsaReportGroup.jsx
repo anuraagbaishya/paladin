@@ -125,9 +125,9 @@ export default function GhsaReportGroup({ group, findings }) {
                     {scans.length > 0 ? (
                         <div className="scan-result-area">
                             {scans.map((scan) => (
-                                <div key={scan._id} className="scan-item">
+                                <div key={scan.scan_id} className="scan-item">
                                     <a
-                                        href={`/sarif/${scan._id}`}
+                                        href={`/scan/${group.repo}/${scan.scan_id}`}
                                         target="_blank"
                                         rel="noopener noreferrer"
                                     >
@@ -138,8 +138,8 @@ export default function GhsaReportGroup({ group, findings }) {
                                         className="delete-btn"
                                         onClick={async () => {
                                             try {
-                                                await fetch(`/api/scans/delete/${scan._id}`, { method: "DELETE" });
-                                                setScans((prev) => prev.filter((s) => s._id !== scan._id));
+                                                await fetch(`/api/scans/delete/${scan.scan_id}`, { method: "DELETE" });
+                                                setScans((prev) => prev.filter((s) => s.scan_id !== scan.scan_id));
                                             } catch (err) {
                                                 console.error("Failed to delete scan", err);
                                             }

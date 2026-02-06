@@ -119,7 +119,7 @@ class Refresher:
             severity=severity,
             cvss_score=cvss_score,
             cvss_vector=cvss_vector,
-            cwe=Cwe(cwe_id, cwe_title) if (cwe_id and cwe_title) else None,
+            cwe=Cwe(id=cwe_id, title=cwe_title) if (cwe_id and cwe_title) else None,
         )
 
     def _get_cvss_score(self, cvss: Dict[str, Any]) -> Optional[Dict[str, Any]]:

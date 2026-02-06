@@ -1,7 +1,5 @@
 import React from "react";
 import RefreshControl from "./RefreshControl";
-import filterIcon from "../assets/filter.png"; // adjust path if needed
-
 export default function Header({
     days, setDays, editingDays, setEditingDays, handleRefresh,
     query, setQuery, setShowFilters
@@ -52,7 +50,16 @@ export default function Header({
                 />
 
                 <button className="filters-button" onClick={() => setShowFilters(true)}>
-                    <img src={filterIcon} className="filters-icon" />
+                    <svg
+                        className="filters-icon"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        width="18"
+                        height="18"
+                    >
+                        <path d="M3 4h18v2H3V4zm3 7h12v2H6v-2zm3 7h6v2H9v-2z" />
+                    </svg>
                     Filters
                 </button>
             </div>

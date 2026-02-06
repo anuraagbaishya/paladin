@@ -8,7 +8,7 @@ export default function App() {
     <Router>
       <Routes>
         <Route path="/" element={<IndexPage />} />
-        <Route path="/sarif/:id" element={<SarifPage />} />
+        <Route path="/scan/:owner/:repo/:id" element={<SarifPage />} />
       </Routes>
     </Router>
   );

@@ -1,19 +1,20 @@
 import logging
 import sys
 import threading
-from pathlib import Path
-from typing import Tuple
 
 from bson import ObjectId
 from flask import Flask, Response, jsonify, render_template, request
 
-from models.data_models import ScanResult
-from models.response_models import (FileError, FileResponse, JobResponse,
-                                    ReviewError, ReviewResponse)
+from models.response_models import (
+    FileError,
+    FileResponse,
+    JobResponse,
+    ReviewError,
+    ReviewResponse,
+)
 from refresher.refresh import Refresher
-from scanner.joern_utils import JoernUtils
 from scanner.scan import Scanner
-from utils.config_verifier import ConfigVerifier
+from utils.config import Config
 from utils.mongo_utils import MongoUtils
 
 # --- Initialize app and logger ---
@@ -22,24 +23,24 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 # --- Initialize configuration and services at module level ---
-verifier: ConfigVerifier = ConfigVerifier("config.toml")
-config = verifier.verify()
-
-if not config:
+try:
+    config = Config("config.toml")
+except (FileNotFoundError, ValueError, TypeError) as e:
+    logger.error(f"Configuration error: {e}")
     sys.exit(1)
 
 mongo_utils: MongoUtils = MongoUtils(config)
-deployment = config["deployment"]
-github_token = config.get("tokens", {}).get("github_token", None)
+github_token = config.github_token if config.github_token else None
 
 scanner: Scanner = Scanner(config, mongo_utils)
-refresher: Refresher = Refresher(github_token, mongo_utils)
+if github_token:
+    refresher: Refresher = Refresher(github_token, mongo_utils)
 
 
 # --- Routes ---
 @app.route("/")
-@app.route("/sarif/<id>")
-def index(id=None) -> str:
+@app.route("/scan/<path:repo>/<id>")
+def index(repo=None, id=None) -> str:
     return render_template("index.html")
 
 
@@ -63,11 +64,18 @@ def submit_scan() -> tuple[Response, int]:
     return jsonify(job.to_dict()), 200
 
 
-@app.route("/api/sarif/<id>")
-def get_sarif(id: str) -> tuple[Response, int]:
-    data: ScanResult | None = mongo_utils.get_scan_by_id(id)
-    if data:
-        return jsonify(data.scan_result), 200
+@app.route("/api/scan/<path:repo>/<id>")
+def get_scan(repo: str, id: str) -> tuple[Response, int]:
+    results = mongo_utils.get_results_by_scan_id(id)
+    if results:
+        serialized = []
+        for r in results:
+            d = r.result.to_dict()  # type: ignore
+            d["suppressed"] = r.suppressed
+            d["severity"] = r.severity
+            d["aiReview"] = r.ai_review.model_dump()
+            serialized.append(d)
+        return jsonify({"scan_id": id, "repo": repo, "results": serialized}), 200
 
     return jsonify({"error": "scan not found"}), 404
 
@@ -83,7 +91,7 @@ def suppress_finding(id: str) -> Response:
 
 @app.route("/api/scans/<path:repo>")
 def get_scans_by_repo(repo) -> Response:
-    results = mongo_utils.get_scans_from_db(repo)
+    results = mongo_utils.get_scans_by_repo(repo)
     return jsonify(results)
 
 
@@ -163,14 +171,3 @@ def review() -> tuple[Response, int]:
             return jsonify(review_response.to_dict()), 500
 
     return jsonify(review_response.to_dict()), 200
-
-
-@app.route("/api/scan/joern", methods=["POST"])
-def joern_analyze() -> tuple[Response, int]:
-    data = request.get_json()
-
-    joern = JoernUtils(Path(config["paths"]["clone_base_dir"]))
-
-    traces = joern.get_trace(data["repo"], data["finding"], data["lang"])
-
-    return jsonify(traces), 200

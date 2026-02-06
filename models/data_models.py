@@ -1,32 +1,38 @@
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Optional
+
+from pydantic import BaseModel, Field
+from pysarif import Result
+
+from .response_models import GeminiReview
 
 
-@dataclass
-class ScanResult:
+class ScanResult(BaseModel):
+    scan_id: str
     repo: str
-    scan_result: Dict[str, Any]  # SARIF is stored as a generic dict
-    timestamp: int = field(
+    result: Result
+    severity: str
+    timestamp: int = Field(
         default_factory=lambda: int(datetime.now(timezone.utc).timestamp())
+    )
+    suppressed: bool = Field(default=False)
+    ai_review: GeminiReview = Field(
+        default_factory=lambda: GeminiReview(verdict=False, reason="")
     )
 
 
-@dataclass
-class RepoInfo:
+class RepoInfo(BaseModel):
     repo: str
     stars: int
     forks: int
 
 
-@dataclass
-class Cwe:
+class Cwe(BaseModel):
     id: str
     title: str
 
 
-@dataclass
-class VulnReport:
+class VulnReport(BaseModel):
     package: str
     repo: Optional[str]
     ecosystem: str  # TODO: make this enum
@@ -41,15 +47,7 @@ class VulnReport:
     cvss_vector: Optional[str]
 
 
-@dataclass
-class FindingForReview:
+class FindingForReview(BaseModel):
     rule_id: str
-    snippet: str
-    description: str
-
-
-@dataclass
-class LocationFromSarif:
-    filepath: str
     snippet: str
     description: str

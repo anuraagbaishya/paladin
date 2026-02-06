@@ -4,30 +4,29 @@ import SarifReportGroup from "./components/SarifReportGroup";
 import { Link } from "react-router-dom";
 
 export default function SarifPage() {
-    const { id } = useParams();
-    const [sarifLog, setSarifLog] = useState(null);
+    const { owner, repo, id } = useParams();
+    const [scanData, setScanData] = useState(null);
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        async function loadSarif() {
+        async function loadScan() {
             try {
-                const resp = await fetch(`/api/sarif/${id}`);
-                if (!resp.ok) throw new Error("Failed to fetch SARIF");
+                const resp = await fetch(`/api/scan/${owner}/${repo}/${id}`);
+                if (!resp.ok) throw new Error("Failed to fetch scan");
                 const data = await resp.json();
-                setSarifLog(data);
+                setScanData(data);
             } catch (err) {
-                console.error("Error loading SARIF:", err);
-                setError("Failed to load SARIF report.");
+                console.error("Error loading scan:", err);
+                setError("Failed to load scan report.");
             }
         }
-        loadSarif();
-    }, [id]);
+        loadScan();
+    }, [owner, repo, id]);
 
     if (error) return <div>{error}</div>;
-    if (!sarifLog) return <div>Loading SARIF report...</div>;
+    if (!scanData) return <div>Loading scan report...</div>;
 
-    // Extract all findings from all runs
-    const findings = (sarifLog.runs ?? []).flatMap(run => run.results ?? []);
+    const findings = scanData.results ?? [];
 
     return (
         <div className="app-container">
