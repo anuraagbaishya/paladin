@@ -15,7 +15,7 @@
 ### 1. Clone the repository
 
 ```bash
-git clone [https://github.com/anuraagbaishya/paladin.git](https://github.com/anuraagbaishya/paladin.git)
+git clone https://github.com/anuraagbaishya/paladin.git
 cd paladin
 ```
 
@@ -37,14 +37,14 @@ port = 9001
 workers = 4
 ```
 
-### 3. Build frontend and backend containers
+### 3. Build containers and run Paladin
 Install `toml-cli` to read `config.toml` from `Makefile`
 ```
 pip install toml-cli
 ```
 
 ```bash
-make up
+make build && make up
 ```
 
 ### 4. Access the app
