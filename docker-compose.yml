@@ -4,6 +4,7 @@ services:
     container_name: paladin
     volumes:
       - ./config.toml:/app/config.toml
+      - ${REPOS_DIR}:${CLONE_BASE_DIR}
     ports:
       - "${HOST_PORT}:${CONTAINER_PORT}"
     depends_on:

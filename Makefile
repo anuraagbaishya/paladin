@@ -6,7 +6,7 @@ CLONE_BASE_DIR := $(shell toml get --toml-path config.toml paths.clone_base_dir)
 MONGO_HOST_PORT := $(shell toml get --toml-path config.toml mongo.port 2>/dev/null || echo 27017)
 HOST_REPOS_DIR := $(shell echo ~/.paladin/repos)
 
-COMPOSE_ENV = HOST_PORT=$(PORT) CONTAINER_PORT=$(PORT) WORKERS=$(WORKERS) MONGO_HOST_PORT=$(MONGO_HOST_PORT)
+COMPOSE_ENV = HOST_PORT=$(PORT) CONTAINER_PORT=$(PORT) WORKERS=$(WORKERS) MONGO_HOST_PORT=$(MONGO_HOST_PORT) REPOS_DIR=$(HOST_REPOS_DIR) CLONE_BASE_DIR=$(CLONE_BASE_DIR)
 
 build:
 	@echo "Building Paladin backend with Semgrep rules path: $(SEMGREP_RULES_DIR)"
@@ -15,9 +15,7 @@ build:
 up:
 	@echo "Starting Paladin on host $(HOST) port $(PORT) with $(WORKERS) workers..."
 	mkdir -p $(HOST_REPOS_DIR)
-	$(COMPOSE_ENV) docker compose run --remove-orphans --service-ports \
-		-v $(HOST_REPOS_DIR):$(CLONE_BASE_DIR) \
-		paladin
+	$(COMPOSE_ENV) docker compose up
 
 down:
 	@echo "Stopping Paladin..."
