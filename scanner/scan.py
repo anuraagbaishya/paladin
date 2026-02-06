@@ -46,7 +46,7 @@ class Scanner:
 
     def run_scan_job(self, job_id: ObjectId, repo_url: str) -> None:
         self.mongo.update_job_status(job_id, JobStatus.RUNNING)
-        repo_name: str = f"{repo_url.split("/")[-2]}/{repo_url.split("/")[-1]}"
+        repo_name: str = f"{repo_url.split('/')[-2]}/{repo_url.split('/')[-1]}"
 
         try:
             repo_path: Path = self.clone_repo(repo_url)
