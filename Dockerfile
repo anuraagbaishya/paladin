@@ -20,7 +20,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Get the scc binary - used to detect languages in the project
-RUN curl -L https://github.com/boyter/scc/releases/download/v3.5.0/scc_Linux_arm64.tar.gz \
+RUN ARCH=$(dpkg --print-architecture) && \
+    case "$ARCH" in \
+        amd64) SCC_ARCH="x86_64" ;; \
+        arm64) SCC_ARCH="arm64" ;; \
+        armhf) SCC_ARCH="arm" ;; \
+        *) echo "Unsupported architecture: $ARCH" && exit 1 ;; \
+    esac && \
+    curl -L "https://github.com/boyter/scc/releases/download/v3.5.0/scc_Linux_${SCC_ARCH}.tar.gz" \
     | tar -xz -C /usr/local/bin scc
 
 # Install Poetry and backend dependencies
