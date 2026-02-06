@@ -10,6 +10,8 @@ services:
     environment:
       - WORKERS=${WORKERS}
       - PORT=${CONTAINER_PORT}
+      - MONGO_HOST=${MONGO_HOST}
+      - MONGO_PORT=${MONGO_PORT}
     restart: unless-stopped
 
   mongo:
