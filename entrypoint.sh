@@ -1,13 +1,10 @@
 #!/bin/sh
-# Wait for Mongo to be ready
 
 MONGO_HOST=${MONGO_HOST:-mongo}
 MONGO_PORT=${MONGO_PORT:-27017}
 
 echo "Waiting for Mongo at $MONGO_HOST:$MONGO_PORT..."
-
-echo "Waiting for MongoDB..."
-while ! nc -z mongo 27017; do
+while ! nc -z "$MONGO_HOST" "$MONGO_PORT"; do
   sleep 1
 done
 

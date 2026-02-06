@@ -8,6 +8,10 @@ HOST_REPOS_DIR := $(shell echo ~/.paladin/repos)
 
 COMPOSE_ENV = HOST_PORT=$(PORT) CONTAINER_PORT=$(PORT) WORKERS=$(WORKERS) MONGO_HOST_PORT=$(MONGO_HOST_PORT) REPOS_DIR=$(HOST_REPOS_DIR) CLONE_BASE_DIR=$(CLONE_BASE_DIR)
 
+ifndef NO_MONGO
+PROFILE_FLAG = --profile mongo
+endif
+
 build:
 	@echo "Building Paladin backend with Semgrep rules path: $(SEMGREP_RULES_DIR)"
 	$(COMPOSE_ENV) docker compose build --build-arg SEMGREP_RULES_DIR=$(SEMGREP_RULES_DIR) paladin
@@ -15,11 +19,11 @@ build:
 up:
 	@echo "Starting Paladin on host $(HOST) port $(PORT) with $(WORKERS) workers..."
 	mkdir -p $(HOST_REPOS_DIR)
-	$(COMPOSE_ENV) docker compose up
+	$(COMPOSE_ENV) docker compose $(PROFILE_FLAG) up
 
 down:
 	@echo "Stopping Paladin..."
-	docker compose down
+	docker compose --profile mongo down
 
 logs:
 	docker compose logs -f paladin
@@ -27,7 +31,7 @@ logs:
 rebuild:
 	@echo "Rebuilding Paladin backend..."
 	$(COMPOSE_ENV) docker compose build --no-cache --build-arg SEMGREP_RULES_DIR=$(SEMGREP_RULES_DIR) paladin
-	$(COMPOSE_ENV) docker compose up --force-recreate paladin
+	$(COMPOSE_ENV) docker compose $(PROFILE_FLAG) up --force-recreate
 
 shell:
 	docker compose exec paladin sh
