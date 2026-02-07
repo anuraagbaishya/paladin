@@ -47,6 +47,16 @@ class VulnReport(BaseModel):
     cvss_vector: Optional[str]
 
 
+class ScanMetadata(BaseModel):
+    scan_id: str
+    repo: str
+    timestamp: int = Field(
+        default_factory=lambda: int(datetime.now(timezone.utc).timestamp())
+    )
+    languages: list[str] = Field(default_factory=list)
+    findings_count: int = 0
+
+
 class FindingForReview(BaseModel):
     rule_id: str
     snippet: str

@@ -12,7 +12,7 @@ import git
 from bson import ObjectId
 from pysarif import Location, Result, Run, SarifLog, load_from_file
 
-from models.data_models import FindingForReview, ScanResult
+from models.data_models import FindingForReview, ScanMetadata, ScanResult
 from models.enums import JobStatus
 from models.response_models import FileError, FileResponse, ReviewError, ReviewResponse
 from utils.config import Config
@@ -50,7 +50,8 @@ class Scanner:
 
         try:
             repo_path: Path = self.clone_repo(repo_url)
-            output: SarifLog | None = self.run_semgrep(repo_path)
+            languages: List[str] = self.detect_languages(repo_path)
+            output: SarifLog | None = self.run_semgrep(repo_path, languages)
 
             if not output:
                 self.mongo.update_job_status(
@@ -64,8 +65,19 @@ class Scanner:
             cleaned_sarif: SarifLog = self.sarif_utils.clean_sarif(output)
             repo_file_path: str = repo_path.name
 
-            self.mongo.insert_scan_result(repo_name, cleaned_sarif)
+            scan_id: str = self.mongo.insert_scan_result(repo_name, cleaned_sarif)
             self.sarif_utils.write_sarif_to_file(cleaned_sarif, repo_file_path)
+
+            findings_count = sum(
+                len(run.results or []) for run in cleaned_sarif.runs or []
+            )
+            metadata = ScanMetadata(
+                scan_id=scan_id,
+                repo=repo_name,
+                languages=languages,
+                findings_count=findings_count,
+            )
+            self.mongo.insert_scan_metadata(metadata)
 
             # Delete if no findings
             self.delete_repo_if_no_findings(repo_path, cleaned_sarif)
@@ -176,31 +188,41 @@ class Scanner:
         return clone_dir
 
     def detect_languages(self, target_dir: Path) -> List[str]:
-        """
-        Detect languages in the repo using SCC and skip excluded languages.
-        """
         cmd = ["scc", "-f", "json", str(target_dir)]
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
             raise RuntimeError(f"SCC failed: {result.stderr}")
 
         data = json.loads(result.stdout)
-        langs = {
+        langs: set[str] = {
             entry["Name"]
             for entry in data
             if entry["Name"] not in self.config.exclude_langs
         }
-        return list(langs)
+
+        exclude_langs: list[str] = [
+            "svg",
+            "shell",
+            "plain text",
+            "markdown",
+            "systemd",
+            "license",
+            "nuspec",
+            "css",
+            "toml",
+            "powershell",
+        ]
+
+        return [lang for lang in langs if lang.lower() not in exclude_langs]
 
     def run_semgrep(
         self,
         target_dir: Path,
+        languages: list[str],
         exclude_globs: Optional[List[str]] = None,
     ) -> SarifLog | None:
         with tempfile.NamedTemporaryFile(mode="w", suffix=".sarif", delete=True) as tmp:
             tmp_path = tmp.name
-
-            languages = self.detect_languages(target_dir)
 
             languages = [lang.lower() for lang in languages]
 

@@ -89,7 +89,7 @@ function SarifReport({ finding, onRemove }) {
                     </button>
                 </div>
 
-                {aiReview && (
+                {aiReview && aiReview.reason && (
                     <div style={{ marginTop: "8px" }}>
                         <p><strong>AI Verdict:</strong> {aiReview.verdict ? "Issue" : "Not an issue"}</p>
                         <p><strong>Reason:</strong> {aiReview.reason}</p>

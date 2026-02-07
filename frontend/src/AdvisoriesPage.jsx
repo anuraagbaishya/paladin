@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import GhsaReportGroup from "./components/GhsaReportGroup";
-import Header from "./components/Header";
+import RefreshControl from "./components/RefreshControl";
 import FilterPanel from "./components/FilterPanel";
-import "./styles.css";
+import { pollJobStatus } from "./utils/jobPolling";
 
-export default function IndexPage() {
+export default function AdvisoriesPage() {
     const [groups, setGroups] = useState([]);
     const [error, setError] = useState(null);
     const [query, setQuery] = useState("");
@@ -15,33 +15,6 @@ export default function IndexPage() {
     const [ecosystemFilter, setEcosystemFilter] = useState("all");
     const [severityFilter, setSeverityFilter] = useState("all");
     const [showFilters, setShowFilters] = useState(false);
-
-    const pollJobStatus = (jobId, interval = 5000) => {
-        return new Promise((resolve, reject) => {
-            const poll = setInterval(async () => {
-                try {
-                    const res = await fetch(`/api/job_status/${jobId}`);
-                    const data = await res.json();
-
-                    if (!res.ok) {
-                        clearInterval(poll);
-                        return reject(data.error || "Failed to get job status");
-                    }
-
-                    if (data.status === "done") {
-                        clearInterval(poll);
-                        resolve(data);
-                    } else if (data.status === "error") {
-                        clearInterval(poll);
-                        reject(data);
-                    }
-                } catch (err) {
-                    clearInterval(poll);
-                    reject(err);
-                }
-            }, interval);
-        });
-    };
 
     const handleRefresh = async (refreshDays = days) => {
         try {
@@ -57,14 +30,10 @@ export default function IndexPage() {
             }
 
             const jobId = data._id;
-            console.log("Refresh job started:", jobId);
 
             try {
                 await pollJobStatus(jobId);
-                console.log("Refresh complete");
-
                 await loadReports();
-
                 setShowAlert("done");
                 setTimeout(() => setShowAlert(false), 3000);
             } catch (err) {
@@ -72,13 +41,11 @@ export default function IndexPage() {
                 setShowAlert("error");
                 setTimeout(() => setShowAlert(false), 3000);
             }
-
         } catch (err) {
             console.error("Failed to refresh reports", err);
             setShowAlert(false);
         }
     };
-
 
     const loadReports = async () => {
         try {
@@ -120,13 +87,49 @@ export default function IndexPage() {
 
     return (
         <div className="app-container">
-            <Header
-                days={days} setDays={setDays}
-                editingDays={editingDays} setEditingDays={setEditingDays}
-                handleRefresh={handleRefresh}
-                query={query} setQuery={setQuery}
-                setShowFilters={setShowFilters}
-            />
+            <div className="page-toolbar">
+                <div className="search-wrapper">
+                    <svg
+                        className="search-icon"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        width="16"
+                        height="16"
+                    >
+                        <path d="M10 2a8 8 0 105.293 14.707l4.387 4.386 1.414-1.414-4.386-4.387A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z" />
+                    </svg>
+                    <input
+                        type="text"
+                        placeholder="Search across all repos..."
+                        value={query}
+                        onChange={(e) => setQuery(e.target.value)}
+                        className="search-input"
+                    />
+                </div>
+
+                <RefreshControl
+                    days={days}
+                    setDays={setDays}
+                    editingDays={editingDays}
+                    setEditingDays={setEditingDays}
+                    handleRefresh={handleRefresh}
+                />
+
+                <button className="filters-button" onClick={() => setShowFilters(true)}>
+                    <svg
+                        className="filters-icon"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        width="18"
+                        height="18"
+                    >
+                        <path d="M3 4h18v2H3V4zm3 7h12v2H6v-2zm3 7h6v2H9v-2z" />
+                    </svg>
+                    Filters
+                </button>
+            </div>
 
             {showAlert && (
                 <div className="refresh-alert">
@@ -135,7 +138,6 @@ export default function IndexPage() {
                     {showAlert === "error" && "Refresh failed!"}
                 </div>
             )}
-
 
             <FilterPanel
                 showFilters={showFilters} setShowFilters={setShowFilters}

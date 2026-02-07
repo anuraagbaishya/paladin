@@ -39,6 +39,8 @@ if github_token:
 
 # --- Routes ---
 @app.route("/")
+@app.route("/scans")
+@app.route("/advisories")
 @app.route("/scan/<path:repo>/<id>")
 def index(repo=None, id=None) -> str:
     return render_template("index.html")
@@ -87,6 +89,12 @@ def suppress_finding(id: str) -> Response:
         id, fingerprint, True
     )
     return jsonify(sarif_with_suppressions)
+
+
+@app.route("/api/scans")
+def get_all_scans() -> Response:
+    results = mongo_utils.get_all_scans()
+    return jsonify(results)
 
 
 @app.route("/api/scans/<path:repo>")

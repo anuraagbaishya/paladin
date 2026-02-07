@@ -8,7 +8,7 @@ from pymongo import MongoClient
 from pymongo.results import DeleteResult
 from pysarif import SarifLog
 
-from models.data_models import ScanResult, VulnReport
+from models.data_models import ScanMetadata, ScanResult, VulnReport
 from models.enums import JobStatus
 from models.response_models import GeminiReview, JobResponse
 from utils.config import Config
@@ -57,7 +57,7 @@ class MongoUtils:
         ]
         return list(self.vuln_reports_collection.aggregate(pipeline))
 
-    def insert_scan_result(self, repo: str, sarif: SarifLog):
+    def insert_scan_result(self, repo: str, sarif: SarifLog) -> str:
         rule_to_severity: dict[str, str] | None = self.rule_to_severity(sarif)
         scan_id = str(uuid4())
 
@@ -83,6 +83,11 @@ class MongoUtils:
 
                 self.scan_result_collection.insert_one(scan_result.model_dump())
 
+        return scan_id
+
+    def insert_scan_metadata(self, metadata: ScanMetadata) -> None:
+        self.scan_metadata.insert_one(metadata.model_dump())
+
     def rule_to_severity(self, sarif: SarifLog) -> dict[str, str] | None:
         rule_to_severity = {}
 
@@ -104,30 +109,16 @@ class MongoUtils:
 
         return rule_to_severity
 
+    def get_all_scans(self, limit: int = 200):
+        return list(
+            self.scan_metadata.find({}, {"_id": 0}).sort("timestamp", -1).limit(limit)
+        )
+
     def get_scans_by_repo(self, repo: str):
         repo = unquote(repo)
-
-        pipeline = [
-            {"$match": {"repo": repo}},
-            {
-                "$group": {
-                    "_id": "$scan_id",
-                    "timestamp": {"$first": "$timestamp"},
-                    "findings_count": {"$sum": 1},
-                }
-            },
-            {
-                "$project": {
-                    "_id": 0,
-                    "scan_id": "$_id",
-                    "timestamp": 1,
-                    "findings_count": 1,
-                }
-            },
-            {"$sort": {"timestamp": -1}},
-        ]
-
-        return list(self.scan_result_collection.aggregate(pipeline))
+        return list(
+            self.scan_metadata.find({"repo": repo}, {"_id": 0}).sort("timestamp", -1)
+        )
 
     def get_result_by_fingerprint(
         self, scan_id: str, fingerprint: str
