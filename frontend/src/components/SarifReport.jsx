@@ -9,23 +9,18 @@ function SarifReport({ finding, onRemove }) {
     const [localSuppressed, setLocalSuppressed] = useState(finding.suppressed || false);
     const { id: scanId } = useParams();
 
-    const loc = finding.locations?.[0]?.physicalLocation;
-    const startLine = loc?.region?.startLine;
-    const endLine = loc?.region?.endLine;
-    const snippet = loc?.region?.snippet?.text;
-    const file = loc?.artifactLocation?.uri;
+    const { file, startLine, endLine, snippet, description, fingerprint } = finding;
 
     if (localSuppressed) return null;
 
     const handleSuppress = async () => {
-        if (!finding.fingerprints) return;
+        if (!fingerprint) return;
 
         setLocalSuppressed(true);
         if (onRemove) onRemove(finding);
 
         try {
-            const fingerprintId = Object.values(finding.fingerprints)[0];
-            const resp = await fetch(`/api/sarif/${scanId}/suppress?fingerprint=${fingerprintId}`, {
+            const resp = await fetch(`/api/sarif/${scanId}/suppress?fingerprint=${fingerprint}`, {
                 method: "GET",
             });
 
@@ -37,17 +32,16 @@ function SarifReport({ finding, onRemove }) {
     };
 
     const handleAiReview = async () => {
-        if (!finding.fingerprints) return;
+        if (!fingerprint) return;
 
         setLoadingAiReview(true);
         try {
-            const fingerprintId = Object.values(finding.fingerprints)[0];
             const resp = await fetch(`/api/scan/review`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     scan_id: scanId,
-                    fingerprint_id: fingerprintId,
+                    fingerprint_id: fingerprint,
                 }),
             });
 
@@ -68,14 +62,14 @@ function SarifReport({ finding, onRemove }) {
         <div className="report finding-item">
             <div className="report-details">
                 {file && <p><strong>File:</strong> {file}</p>}
-                {loc && startLine && (
+                {startLine && (
                     <p>
                         <strong>Lines:</strong> {startLine}
                         {endLine && startLine !== endLine ? `-${endLine}` : ""}
                     </p>
                 )}
                 {snippet && <pre>{snippet}</pre>}
-                {finding.message?.text && <p>{finding.message.text}</p>}
+                {description && <p>{description}</p>}
 
                 <div style={{ display: "flex", gap: "8px", marginTop: "4px" }}>
                     {file && (

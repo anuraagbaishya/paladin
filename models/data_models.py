@@ -2,23 +2,40 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel, Field
-from pysarif import Result
 
-from .response_models import GeminiReview
+from .response_models import AiReview
 
 
 class ScanResult(BaseModel):
     scan_id: str
-    repo: str
-    result: Result
+    fingerprint: str
+    file: str
+    start_line: int
+    end_line: int
+    rule_id: str
+    snippet: str
+    description: str
     severity: str
-    timestamp: int = Field(
-        default_factory=lambda: int(datetime.now(timezone.utc).timestamp())
-    )
+    dataflows: Optional[list] = Field(default=None)
     suppressed: bool = Field(default=False)
-    ai_review: GeminiReview = Field(
-        default_factory=lambda: GeminiReview(verdict=False, reason="")
+    ai_review: AiReview = Field(
+        default_factory=lambda: AiReview(verdict=False, reason="")
     )
+
+    def to_api_dict(self) -> dict:
+        return {
+            "fingerprint": self.fingerprint,
+            "file": self.file,
+            "startLine": self.start_line,
+            "endLine": self.end_line,
+            "ruleId": self.rule_id,
+            "snippet": self.snippet,
+            "description": self.description,
+            "severity": self.severity,
+            "dataflows": self.dataflows,
+            "suppressed": self.suppressed,
+            "aiReview": self.ai_review.model_dump(),
+        }
 
 
 class RepoInfo(BaseModel):
@@ -58,6 +75,5 @@ class ScanMetadata(BaseModel):
 
 
 class FindingForReview(BaseModel):
-    rule_id: str
-    snippet: str
-    description: str
+    repo: str
+    scan_result: ScanResult

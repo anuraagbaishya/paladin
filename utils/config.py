@@ -71,15 +71,15 @@ class Config:
         # Settings section (optional)
         settings = self._config.get("settings", {})
         self.write_sarif_to_file: bool = settings.get("write_sarif_to_file", False)
-        self.exclude_langs: list[str] = settings.get("exclude_langs", [])
+        self.exclude_langs: list[str] = [
+            lang.lower() for lang in settings.get("exclude_langs", [])
+        ]
         self.suppress_paths: list[str] = settings.get("suppress_paths", [])
         self.suppress_rules: list[str] = settings.get("suppress_rules", [])
-        self.gemini_model: str = settings.get("gemini_model", "")
 
         # Tokens section (optional)
         tokens = self._config.get("tokens", {})
         self.github_token: str = tokens.get("github_token", "")
-        self.gemini_api_key: str = tokens.get("gemini_api_key", "")
 
         # MongoDB section (optional, with defaults)
         mongo = self._config.get("mongo", {})
@@ -91,3 +91,4 @@ class Config:
         self.host: str = deployment["host"]
         self.port: int = deployment["port"]
         self.workers: int = deployment["workers"]
+        self.claude_bridge_port: int = deployment["claude_bridge_port"]

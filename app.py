@@ -8,6 +8,7 @@ from flask import Flask, Response, jsonify, render_template, request
 from models.response_models import (
     FileError,
     FileResponse,
+    AiReview,
     JobResponse,
     ReviewError,
     ReviewResponse,
@@ -70,13 +71,7 @@ def submit_scan() -> tuple[Response, int]:
 def get_scan(repo: str, id: str) -> tuple[Response, int]:
     results = mongo_utils.get_results_by_scan_id(id)
     if results:
-        serialized = []
-        for r in results:
-            d = r.result.to_dict()  # type: ignore
-            d["suppressed"] = r.suppressed
-            d["severity"] = r.severity
-            d["aiReview"] = r.ai_review.model_dump()
-            serialized.append(d)
+        serialized = [r.to_api_dict() for r in results]
         return jsonify({"scan_id": id, "repo": repo, "results": serialized}), 200
 
     return jsonify({"error": "scan not found"}), 404
@@ -160,6 +155,21 @@ def get_file() -> tuple[Response, int]:
             return jsonify(file_response.to_dict()), 500
 
     return jsonify(file_response.to_dict()), 200
+
+
+@app.route("/api/scan/verdict", methods=["POST"])
+def set_verdict() -> tuple[Response, int]:
+    data = request.get_json()
+    if not data or "scan_id" not in data or "fingerprint" not in data:
+        return jsonify({"error": "scan_id and fingerprint are required"}), 400
+    if "verdict" not in data or "reason" not in data:
+        return jsonify({"error": "verdict and reason are required"}), 400
+
+    review = AiReview(verdict=data["verdict"], reason=data["reason"])
+    mongo_utils.update_ai_review_by_scan_id(
+        data["scan_id"], data["fingerprint"], review
+    )
+    return jsonify({"status": "OK"}), 200
 
 
 @app.route("/api/scan/review", methods=["POST"])

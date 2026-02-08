@@ -10,7 +10,7 @@ from pysarif import SarifLog
 
 from models.data_models import ScanMetadata, ScanResult, VulnReport
 from models.enums import JobStatus
-from models.response_models import GeminiReview, JobResponse
+from models.response_models import AiReview, JobResponse
 from utils.config import Config
 
 
@@ -20,9 +20,8 @@ class MongoUtils:
         self.db = self.client.paladin
         self.vuln_reports_collection = self.db.vuln_reports
         self.scan_metadata = self.db.scan_metadata
-        self.jobs_collection = self.db.scan_jobs
-        self.scan_result_collection = self.db.scan_results
-        self.cwe_collection = self.db.cwes
+        self.jobs = self.db.scan_jobs
+        self.scan_result = self.db.scan_results
 
     def get_reports_by_pkg(self):
         pipeline = [
@@ -57,7 +56,7 @@ class MongoUtils:
         ]
         return list(self.vuln_reports_collection.aggregate(pipeline))
 
-    def insert_scan_result(self, repo: str, sarif: SarifLog) -> str:
+    def insert_scan_result(self, sarif: SarifLog) -> str:
         rule_to_severity: dict[str, str] | None = self.rule_to_severity(sarif)
         scan_id = str(uuid4())
 
@@ -69,6 +68,36 @@ class MongoUtils:
                 if not result or not result.rule_id:
                     continue
 
+                loc = result.locations[0] if result.locations else None
+                if not loc or not loc.physical_location:
+                    continue
+
+                phys = loc.physical_location
+                file_uri = (
+                    phys.artifact_location.uri if phys.artifact_location else None
+                )
+                start_line = phys.region.start_line if phys.region else None
+                end_line = phys.region.end_line if phys.region else None
+                snippet_text = (
+                    phys.region.snippet.text or ""
+                    if phys.region and phys.region.snippet
+                    else ""
+                )
+
+                if not file_uri or start_line is None:
+                    continue
+
+                fingerprint = (
+                    result.fingerprints.get("paladin", "")
+                    if result.fingerprints
+                    else ""
+                )
+                description = (result.message.text or "") if result.message else ""
+
+                dataflows = None
+                if result.code_flows:
+                    dataflows = [cf.to_dict() for cf in result.code_flows]  # type: ignore[union-attr]
+
                 if not rule_to_severity:
                     severity: str = "unknown"
                 else:
@@ -76,12 +105,18 @@ class MongoUtils:
 
                 scan_result = ScanResult(
                     scan_id=scan_id,
-                    repo=repo,
-                    result=result,
+                    fingerprint=fingerprint,
+                    file=file_uri,
+                    start_line=start_line,
+                    end_line=end_line or start_line,
+                    rule_id=result.rule_id,
+                    snippet=snippet_text,
+                    description=description,
                     severity=severity.lower(),
+                    dataflows=dataflows,
                 )
 
-                self.scan_result_collection.insert_one(scan_result.model_dump())
+                self.scan_result.insert_one(scan_result.model_dump())
 
         return scan_id
 
@@ -123,8 +158,8 @@ class MongoUtils:
     def get_result_by_fingerprint(
         self, scan_id: str, fingerprint: str
     ) -> ScanResult | None:
-        result = self.scan_result_collection.find_one(
-            {"result.fingerprint.paladin": fingerprint, "scan_id": scan_id}
+        result = self.scan_result.find_one(
+            {"fingerprint": fingerprint, "scan_id": scan_id}
         )
         if not result:
             return None
@@ -134,60 +169,49 @@ class MongoUtils:
     def update_suppression_by_fingerprint(
         self, scan_id: str, fingerprint: str, suppressed: bool
     ):
-        self.scan_result_collection.update_one(
-            {"scan_id": str(scan_id), "result.fingerprint.paladin": fingerprint},
+        self.scan_result.update_one(
+            {"scan_id": str(scan_id), "fingerprint": fingerprint},
             {"$set": {"suppressed": suppressed}},
         )
 
     def update_ai_review_by_scan_id(
-        self, scan_id: str, fingerprint: str, ai_review: GeminiReview
+        self, scan_id: str, fingerprint: str, ai_review: AiReview
     ):
-        self.scan_result_collection.update_one(
-            {"scan_id": str(scan_id), "result.fingerprint.paladin": fingerprint},
+        self.scan_result.update_one(
+            {"scan_id": str(scan_id), "fingerprint": fingerprint},
             {"$set": {"ai_review": ai_review.model_dump()}},
         )
 
     def get_scan_by_id(self, scan_id: str) -> ScanResult | None:
-        scan = self.scan_result_collection.find_one(
-            {"scan_id": str(scan_id)}, {"_id": 0}
-        )
+        scan = self.scan_result.find_one({"scan_id": str(scan_id)}, {"_id": 0})
         if scan:
             return ScanResult(**scan)
         else:
             return None
 
     def get_results_by_scan_id(self, scan_id: str) -> list[ScanResult]:
-        results = self.scan_result_collection.find(
-            {"scan_id": str(scan_id)}, {"_id": 0}
+        results = self.scan_result.find(
+            {"scan_id": str(scan_id), "suppressed": False}, {"_id": 0}
         ).to_list()
         return [ScanResult(**r) for r in results]
 
-    def delete_scan_by_id(self, id: str) -> bool:
-        result: DeleteResult = self.scan_result_collection.delete_one(
-            {"_id": ObjectId(id)}
-        )
+    def delete_scan_by_id(self, scan_id: str) -> bool:
+        result: DeleteResult = self.scan_result.delete_many({"scan_id": scan_id})
+        result = self.scan_metadata.delete_one({"scan_id": scan_id})
         return result.deleted_count > 0
-
-    def update_result_by_id(
-        self, scan_id: str, fingerprint: str, result: ScanResult
-    ) -> None:
-        self.scan_result_collection.update_one(
-            {"scan_id": scan_id, "result.fingerprint.paladin": fingerprint},
-            {"$set": {"result": result.result}},
-        )
 
     def add_job_to_db(self, job: JobResponse) -> ObjectId:
         job_dict: Dict[str, Any] = job.to_dict()
         job_dict.pop("_id")
 
-        result = self.jobs_collection.insert_one(job_dict)
+        result = self.jobs.insert_one(job_dict)
 
         return result.inserted_id
 
     def update_job_status(
         self, job_id: ObjectId, status: JobStatus, error: Optional[str] = None
     ) -> None:
-        self.jobs_collection.update_one(
+        self.jobs.update_one(
             {"_id": job_id},
             {
                 "$set": {
@@ -199,7 +223,7 @@ class MongoUtils:
         )
 
     def get_job_by_id(self, job_id: str) -> Optional[JobResponse]:
-        res = self.jobs_collection.find_one({"_id": ObjectId(job_id)})
+        res = self.jobs.find_one({"_id": ObjectId(job_id)})
         if not res:
             return None
 
@@ -212,3 +236,10 @@ class MongoUtils:
             {"$set": report.model_dump()},
             upsert=True,
         )
+
+    def get_repo_by_scan_id(self, scan_id: str) -> Optional[str]:
+        repo = self.scan_metadata.find_one({"scan_id": scan_id}, {"_id": 0, "repo": 1})
+        if repo:
+            return repo["repo"]
+
+        return None

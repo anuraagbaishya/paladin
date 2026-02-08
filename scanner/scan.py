@@ -10,15 +10,21 @@ from typing import List, Optional
 
 import git
 from bson import ObjectId
-from pysarif import Location, Result, Run, SarifLog, load_from_file
+from pysarif import Run, SarifLog, load_from_file
+import requests
 
 from models.data_models import FindingForReview, ScanMetadata, ScanResult
 from models.enums import JobStatus
-from models.response_models import FileError, FileResponse, ReviewError, ReviewResponse
+from models.response_models import (
+    ClaudeResponse,
+    FileError,
+    FileResponse,
+    ReviewError,
+    ReviewResponse,
+)
 from utils.config import Config
 from utils.mongo_utils import MongoUtils
 
-from .gemini_ops import GeminiOps
 from .sarif_utils import SarifUtils
 
 logging.basicConfig(level=logging.INFO)
@@ -35,10 +41,6 @@ class Scanner:
             suppress_paths=self.config.suppress_paths,
             suppress_rules=self.config.suppress_rules,
             sarif_write_dir=self.config.sarif_write_dir,
-        )
-
-        self.gemini_ops = GeminiOps(
-            self.config.gemini_api_key, self.config.gemini_model
         )
 
         if not self.config.clone_base_dir.exists():
@@ -65,7 +67,7 @@ class Scanner:
             cleaned_sarif: SarifLog = self.sarif_utils.clean_sarif(output)
             repo_file_path: str = repo_path.name
 
-            scan_id: str = self.mongo.insert_scan_result(repo_name, cleaned_sarif)
+            scan_id: str = self.mongo.insert_scan_result(cleaned_sarif)
             self.sarif_utils.write_sarif_to_file(cleaned_sarif, repo_file_path)
 
             findings_count = sum(
@@ -123,53 +125,48 @@ class Scanner:
             return FileResponse(FileError.READ_FAIL)
 
     def review(self, scan_id: str, fingerprint_id: str) -> ReviewResponse:
-        if not self.gemini_ops:
-            return ReviewResponse(ReviewError.NO_API_KEY)
+        repo: str | None = self.mongo.get_repo_by_scan_id(scan_id)
+        if not repo:
+            return ReviewResponse(error=ReviewError.NO_FINDING)
+
+        repo_path = str(self.config.clone_base_dir / repo)
 
         scan_result: ScanResult | None = self.mongo.get_result_by_fingerprint(
             scan_id, fingerprint_id
         )
         if not scan_result:
-            return ReviewResponse(ReviewError.NO_FINDING)
+            return ReviewResponse(error=ReviewError.NO_FINDING)
 
-        location: Location | None = (
-            scan_result.result.locations[0] if scan_result.result.locations else None
-        )
-
-        if not self.sarif_utils.validate_location(location):
-            return ReviewResponse(ReviewError.INCOMPLETE_FINDING)
-
-        filepath: str = location.physical_location.artifact_location.uri  # type: ignore
-        snippet: str = location.physical_location.region.snippet.text  # type: ignore
-
-        file: FileResponse = self.get_file(filepath)
+        if not scan_result.file or not scan_result.snippet:
+            return ReviewResponse(error=ReviewError.INCOMPLETE_FINDING)
 
         finding_for_review: FindingForReview = FindingForReview(
-            scan_result.result.rule_id, snippet, scan_result.result.message.text  # type: ignore
+            repo=repo_path, scan_result=scan_result
         )
 
         try:
-
-            gemini_response: ReviewResponse = self.gemini_ops.review(
-                finding_for_review, None, file.file
+            claude_response: Optional[ClaudeResponse] = self.claude_code_assessment(
+                finding_for_review
             )
 
-            if gemini_response.error:
-                self.logger.error(f"Gemini response failed: {gemini_response.error}")
-                return ReviewResponse(ReviewError.REVIEW_FAIL)
+            if not claude_response:
+                self.logger.error("Claude assessment failed: no response received")
+                return ReviewResponse(error=ReviewError.REVIEW_FAIL)
 
-            if not gemini_response.review:
-                self.logger.error("Gemini response failed, no review received")
-                return ReviewResponse(ReviewError.REVIEW_FAIL)
+            if not claude_response.review:
+                self.logger.error(
+                    f"Claude response failed, no review received: {claude_response.error}"
+                )
+                return ReviewResponse(error=ReviewError.REVIEW_FAIL)
 
             self.mongo.update_ai_review_by_scan_id(
-                scan_id, fingerprint_id, gemini_response.review
+                scan_id, fingerprint_id, claude_response.review
             )
 
-            return gemini_response
+            return ReviewResponse(review=claude_response.review)
         except RuntimeError as e:
-            self.logger.error(f"Gemini review failed: {e}")
-            return ReviewResponse(ReviewError.REVIEW_FAIL)
+            self.logger.error(f"Claude review failed: {e}")
+            return ReviewResponse(error=ReviewError.REVIEW_FAIL)
 
     def clone_repo(self, repo_url: str, clone_base_dir: Optional[Path] = None) -> Path:
         # Use last two parts of repo for folder name (e.g., github.com/rs/cors -> rs/cors)
@@ -197,23 +194,10 @@ class Scanner:
         langs: set[str] = {
             entry["Name"]
             for entry in data
-            if entry["Name"] not in self.config.exclude_langs
+            if entry["Name"].lower() not in self.config.exclude_langs
         }
 
-        exclude_langs: list[str] = [
-            "svg",
-            "shell",
-            "plain text",
-            "markdown",
-            "systemd",
-            "license",
-            "nuspec",
-            "css",
-            "toml",
-            "powershell",
-        ]
-
-        return [lang for lang in langs if lang.lower() not in exclude_langs]
+        return list(langs)
 
     def run_semgrep(
         self,
@@ -238,7 +222,6 @@ class Scanner:
                 self.logger.info("No valid rule directories found.")
                 return None
 
-            # Build semgrep command
             cmd: List[str] = ["semgrep"]
             for rule_dir in valid_rule_dirs:
                 cmd.extend(["-f", str(rule_dir)])
@@ -263,11 +246,28 @@ class Scanner:
         if not runs:
             shutil.rmtree(repo_dir)
             self.logger.info(f"Deleted {repo_dir} (no findings)")
+            return
 
-        results: List[Result] | None = sarif.runs[0].results
+        results = sarif.runs[0].results
 
         if not results:
             shutil.rmtree(repo_dir)
             self.logger.info(f"Deleted {repo_dir} (no findings)")
         else:
             self.logger.info(f"Findings detected in {repo_dir}, keeping repo.")
+
+    def claude_code_assessment(
+        self, finding_for_review: FindingForReview
+    ) -> Optional[ClaudeResponse]:
+        # bridge server runs on host
+        bridge_server_url = os.getenv("CLAUDE_BRIDGE_URL", "")
+        if not bridge_server_url:
+            return None
+
+        response = requests.post(
+            f"{bridge_server_url}/review", json=finding_for_review.model_dump()
+        )
+        if response and response.json():
+            return ClaudeResponse.model_validate(response.json())
+
+        return None

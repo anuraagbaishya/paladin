@@ -21,26 +21,29 @@ class FileResponse:
         return d
 
 
-# gemini structured output expects pydantic basemodels
-class GeminiReview(BaseModel):
+class AiReview(BaseModel):
     verdict: bool
     reason: str
 
 
-@dataclass
-class ReviewResponse:
+class ReviewResponse(BaseModel):
     error: Optional[ReviewError] = None
-    review: Optional[GeminiReview] = None
+    review: Optional[AiReview] = None
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
-        if isinstance(self.review, GeminiReview):
+        if isinstance(self.review, AiReview):
             d["review"] = self.review.model_dump()
 
         if isinstance(self.error, Enum):
             d["error"] = self.error.value
 
         return d
+
+
+class ClaudeResponse(BaseModel):
+    error: Optional[str] = None
+    review: Optional[AiReview] = None
 
 
 @dataclass
