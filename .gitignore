@@ -4,3 +4,4 @@ __pycache__/
 .vscode
 static
 config.toml
+bridge_server.log

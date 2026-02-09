@@ -184,8 +184,8 @@ def review() -> tuple[Response, int]:
 
     if review_response.error:
         if review_response.error == ReviewError.SCAN_NOT_FOUND:
-            return jsonify(review_response.to_dict()), 404
+            return jsonify(review_response.model_dump()), 404
         else:
-            return jsonify(review_response.to_dict()), 500
+            return jsonify(review_response.model_dump()), 500
 
-    return jsonify(review_response.to_dict()), 200
+    return jsonify(review_response.model_dump()), 200

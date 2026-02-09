@@ -2,6 +2,17 @@ from flask import Flask, request, jsonify
 import subprocess
 import json
 from bridge_models import AiReview, ClaudeResponse, FindingForReview
+import logging
+from pathlib import Path
+
+LOG_FILE = Path(__file__).resolve().parent.parent / "bridge_server.log"
+logging.basicConfig(
+    level=logging.INFO,
+    filename=str(LOG_FILE),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+logger = logging.getLogger(__name__)
+
 
 app = Flask(__name__)
 
@@ -18,6 +29,7 @@ schema = {
 @app.route("/review", methods=["POST"])
 def analyze_code():
     data = request.get_json()
+
     finding = FindingForReview.model_validate(data)
 
     try:
@@ -32,6 +44,8 @@ def analyze_code():
             json.dumps(schema),
             prompt,
         ]
+
+        logger.info(f"Running assessment with command {cmd}")
 
         result: subprocess.CompletedProcess = subprocess.run(
             cmd,
@@ -50,6 +64,8 @@ def analyze_code():
             error=result.stderr,
             review=AiReview.model_validate(jsonified_stdout["structured_output"]),
         )
+
+        logger.info(f"{claude_response}")
 
         return jsonify(claude_response.model_dump())
 

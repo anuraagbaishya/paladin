@@ -259,6 +259,7 @@ class Scanner:
     def claude_code_assessment(
         self, finding_for_review: FindingForReview
     ) -> Optional[ClaudeResponse]:
+        self.logger.info(f"Reviewing {finding_for_review.model_dump()}")
         # bridge server runs on host
         bridge_server_url = os.getenv("CLAUDE_BRIDGE_URL", "")
         if not bridge_server_url:
@@ -268,6 +269,7 @@ class Scanner:
             f"{bridge_server_url}/review", json=finding_for_review.model_dump()
         )
         if response and response.json():
+            self.logger.info(f"Claude response: {response.json()}")
             return ClaudeResponse.model_validate(response.json())
 
         return None

@@ -8,7 +8,7 @@
 4. View SARIF output of the scans using a custom viewer
 5. View source files referenced in SARIF findings
 6. Suppress individual findings from SARIF scans
-7. Review findings using Google Gemini
+7. Review findings using Claude Code AI
 
 ## Installation
 
@@ -35,19 +35,30 @@ github_token = ""
 host = "127.0.0.1"
 port = 9001
 workers = 4
+claude_bridge_port = 3000
 ```
 
-### 3. Build containers and run Paladin
-Install `toml-cli` to read `config.toml` from `Makefile`
+### 3. Install prerequisites
+
+Install `toml-cli` to read `config.toml` from `Makefile`:
 ```
 pip install toml-cli
 ```
+
+Install [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) for AI-powered finding reviews:
+```
+npm install -g @anthropic-ai/claude-code
+```
+
+### 4. Build containers and run Paladin
 
 ```bash
 make build && make up
 ```
 
-### 4. Access the app
+This starts the Docker containers and the bridge server on the host.
+
+### 5. Access the app
 
 * Open `http://<HOST>:<PORT>` as configured in `config.toml` under `[deployment]`.
 * Default: [`http://127.0.0.1:9001`](http://127.0.0.1:9001)
@@ -66,12 +77,14 @@ The SARIF Viewer provides these functionalities for each finding:
 * A View File button that opens the source file in an embedded code viewer.
 * A Suppress button that hides finding from the UI and marks it as suppressed in the backend.
 * Suppressed findings will not be shown in future views.
-* An AI Review button that uses Google Gemini to review the finding
+* An AI Review button that uses Claude Code to review the finding
 
 ### AI Review
-* To use Google Gemini, an API key is required. See this doc on generating a key. Once you have the key, add it to your config.toml under tokens -> gemini_api_key.
-* By default Paladin uses gemini-2.5-flash-lite but this can be configured in config.toml under settings -> gemini_model.
-* Currently only single file analysis is supported. This means only the file where the finding was reported will be sent as context to Gemini.
+* AI Review uses Claude Code via a bridge server that runs on the host machine (outside Docker).
+* The bridge server is started automatically by `make up` and listens on the port configured in `config.toml` under `deployment.claude_bridge_port`.
+* **Prerequisite:** [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) must be installed and authenticated on the host machine.
+* The bridge server sends the finding details and repository path to Claude Code, which analyzes the code in context and returns a structured verdict (true positive / false positive with reasoning).
+* Reviews may take a few minutes as Claude Code performs deep analysis of the codebase.
 
 ### Refreshing GHSAs
 * Click the refresh button on the top toolbar.
@@ -81,4 +94,3 @@ The SARIF Viewer provides these functionalities for each finding:
 ## TO DO
 
 * Add ability to toggle viewing suppressed results at repo level
-* Add a feature to add repos directly to scan instead of requiring GitHub security advisory reports

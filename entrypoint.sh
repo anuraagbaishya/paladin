@@ -19,4 +19,4 @@ esac
 
 echo "Starting Gunicorn..."
 
-exec gunicorn --bind 0.0.0.0:$PORT app:app --workers $WORKERS
+exec gunicorn --bind 0.0.0.0:$PORT app:app --workers $WORKERS --timeout ${GUNICORN_TIMEOUT:-600}

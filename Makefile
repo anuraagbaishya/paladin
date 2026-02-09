@@ -23,11 +23,14 @@ up:
 	mkdir -p $(CLONE_BASE_DIR)
 	$(COMPOSE_ENV) docker compose $(PROFILE_FLAG) up -d
 	@echo "Starting bridge server at localhost:$(CLAUDE_BRIDGE_PORT)"
-	cd bridge_server && poetry run flask --app server run --host 0.0.0.0 --port $(CLAUDE_BRIDGE_PORT)
+	cd bridge_server && nohup poetry run gunicorn --bind 127.0.0.1:$(CLAUDE_BRIDGE_PORT) server:app -w 4 --timeout 600 --access-logfile ../bridge_server.log --error-logfile ../bridge_server.log > /dev/null 2>&1 &
+	@echo "Bridge server started (logs: bridge_server.log)"
 
 down:
 	@echo "Stopping Paladin..."
 	$(COMPOSE_ENV) docker compose --profile mongo down
+	@echo "Stopping bridge server..."
+	-lsof -ti :$(CLAUDE_BRIDGE_PORT) | xargs kill 2>/dev/null || true
 
 logs:
 	$(COMPOSE_ENV) docker compose logs -f paladin
